@@ -1,6 +1,7 @@
 package response;
 
 import java.time.Instant;
+import java.util.UUID;
 
 public class ApiResponse<T> {
     private final String code;
@@ -17,12 +18,12 @@ public class ApiResponse<T> {
         this.traceId = traceId;
     }
 
-    public static <T> ApiResponse<T> success(String code, String message, T data, String traceId) {
-        return new ApiResponse<>(true, code, message, data, Instant.now(), traceId);
+    public static <T> ApiResponse<T> success(String code, String message, T data) {
+        return new ApiResponse<>(true, code, message, data, Instant.now(), UUID.randomUUID().toString());
     }
 
-    public static <T> ApiResponse<T> error(String code, String message, String traceId) {
-        return new ApiResponse<>(false, code, message, null, Instant.now(), traceId);
+    public static <T> ApiResponse<T> error(String code, String message) {
+        return new ApiResponse<>(false, code, message, null, Instant.now(), UUID.randomUUID().toString());
     }
 
     public String getTraceId() {

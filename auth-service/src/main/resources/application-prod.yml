@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto:  validate  # Production nên dùng validate, không auto-update
+    database-platform: org. hibernate.dialect.MySQLDialect
+    show-sql: false
+
+  # Import secrets từ AWS Secrets Manager
+  config:
+    import:
+      - aws-secretsmanager:micro-ecommerce/auth/db-configuration
+      - aws-secretsmanager:micro-ecommerce/auth/jwt
+  cloud:
+    aws:
+      cloudwatch:
+        region: ap-southeast-2
+
+# JWT configuration từ AWS Secrets Manager
+jwt:
+  secret: ${jwtSecret}
+  expiration: ${accessTokenExpiry}
+  expiration-refresh: ${refreshTokenExpiry}
+
+# AWS Configuration
+
+logging:
+  level:
+    root: WARN
+    com.ecommerce.authservice: INFO

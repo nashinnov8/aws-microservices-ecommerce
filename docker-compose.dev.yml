@@ -3,7 +3,7 @@ version: '3.8'
 services:
   mysql:
     image: mysql:8.0
-    container_name: ecommerce-mysql
+    container_name: ecommerce-mysql-dev
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: auth_db
@@ -12,36 +12,28 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql_dev_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test:  ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - ecommerce-network
+      - ecommerce-dev-network
 
   auth-service:
     build:
       context: .
       dockerfile: auth-service/Dockerfile
-    container_name: auth-service
+    container_name: auth-service-dev
     environment:
-      # Spring
-      SPRING_PROFILES_ACTIVE: docker
+      # Chọn profile DEVELOPMENT
+      SPRING_PROFILES_ACTIVE: dev
 
-      # DB
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/auth_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh
+      # Override nếu cần (optional vì đã có trong application-dev.yml)
+      SPRING_DATASOURCE_URL:  jdbc:mysql://mysql:3306/auth_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh
       SPRING_DATASOURCE_USERNAME: auth
       SPRING_DATASOURCE_PASSWORD: auth
-
-      # AWS
-      AWS_REGION: ap-southeast-2
-      AWS_SECRET_NAME: micro-ecommerce/auth/jwt
-
-    volumes:
-      # using AWS CLI credentials local
-      - ~/.aws:/root/.aws:ro
 
     ports:
       - "8080:8080"
@@ -49,11 +41,11 @@ services:
       mysql:
         condition: service_healthy
     networks:
-      - ecommerce-network
+      - ecommerce-dev-network
 
 networks:
-  ecommerce-network:
+  ecommerce-dev-network:
     driver: bridge
 
 volumes:
-  mysql_data:
+  mysql_dev_data:

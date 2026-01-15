@@ -1,9 +1,6 @@
 package com.ecommerce.authservice.controller;
 
-import com.ecommerce.authservice.dto.LoginResponse;
-import com.ecommerce.authservice.dto.LoginRequest;
-import com.ecommerce.authservice.dto.RegisterRequest;
-import com.ecommerce.authservice.dto.RegisterResponse;
+import com.ecommerce.authservice.dto.*;
 import com.ecommerce.authservice.service.AuthService;
 import com.ecommerce.authservice.utils.ClientInfoUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,17 +21,21 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<RegisterResponse>> register(@RequestBody RegisterRequest request) {
-        String traceId = UUID.randomUUID().toString();
         RegisterResponse response = authService.register(request);
-        return ResponseEntity.ok(ApiResponse.success("200", "Registration successful", response, traceId));
+        return ResponseEntity.ok(ApiResponse.success("200", "Registration successful", response));
     }
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
-        String traceId = UUID.randomUUID().toString();
         String clientIp = ClientInfoUtil.getClientIp(httpRequest);
         String deviceInfo = httpRequest.getHeader("User-Agent");
         LoginResponse response = authService.login(request, clientIp, deviceInfo);
-        return ResponseEntity.ok(ApiResponse.success("200", "Login successful", response, traceId));
+        return ResponseEntity.ok(ApiResponse.success("200", "Login successful", response));
+    }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(@RequestBody RefreshTokenRequest request) {
+        LoginResponse response = authService.refreshToken(request);
+        return ResponseEntity.ok(ApiResponse.success("200", "Token refreshed successfully", response));
     }
 }
