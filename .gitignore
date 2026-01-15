@@ -1,1 +1,84 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
 
+# Java
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+!**/target/**/*.jar
+hs_err_pid*
+
+# IDE - JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+*.jks
+out/
+
+# IDE - VS Code
+.vscode/
+*.code-workspace
+
+# Eclipse
+.classpath
+.project
+.settings/
+*.launch
+
+# NetBeans
+nbproject/
+nb-configuration.xml
+*.nbfs
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+
+# Docker
+.docker/
+
+# Build outputs
+bin/
+dist/
+build/
+
+# Node (if used in any part of the project)
+node_modules/
+npm-debug.log
+
+# Temporary files
+*.tmp
+*.temp
+.*.swp
