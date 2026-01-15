@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  auth-service:
+    image: ${ECR_REGISTRY}/auth-service:${IMAGE_TAG:-latest}
+    container_name: auth-service-prod
+    environment:
+      # Chọn profile PRODUCTION
+      SPRING_PROFILES_ACTIVE: prod
+
+      # Database connection (có thể lấy từ env hoặc Secrets Manager)
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD:  ${SPRING_DATASOURCE_PASSWORD}
+
+      # AWS Configuration để access Secrets Manager
+      AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+
+    volumes:
+      # Mount AWS credentials để có thể access Secrets Manager
+      - ~/. aws:/root/.aws:ro
+
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - ecommerce-prod-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval:  30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  ecommerce-prod-network:
+    driver: bridge

@@ -1,26 +1,17 @@
 spring:
   application:
     name: auth-service
-
-  datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-
   jpa:
-    hibernate:
-      ddl-auto: update
-    database-platform: org.hibernate.dialect.MySQLDialect
+    show-sql: false
 
-  config:
-    import:
-      - aws-secretsmanager:micro-ecommerce/auth/db-configuration
-      - aws-secretsmanager:micro-ecommerce/auth/jwt
+server:
+  port: 8080
 
 jwt:
-  secret: ${jwtSecret}
-  expiration: ${accessTokenExpiry}
-  expiration-refresh: ${refreshTokenExpiry}
+  secret: default-secret-key-change-in-production
+  expiration: 3600000
+  expiration-refresh: 86400000
+
 management:
   endpoints:
     web:
@@ -31,5 +22,3 @@ management:
       probes:
         enabled: true
       show-details: never
-server:
-  port: 8080
