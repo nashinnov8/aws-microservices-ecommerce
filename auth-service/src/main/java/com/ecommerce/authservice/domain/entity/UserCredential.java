@@ -30,10 +30,8 @@ public class UserCredential extends BaseEntity {
 
     private boolean enabled = false;
 
-    @Column(name = "password_reset_token")
     private String passwordResetToken;
 
-    @Column(name = "password_reset_token_expiry")
     private Instant passwordResetTokenExpiry;
 
     public UserCredential() {}

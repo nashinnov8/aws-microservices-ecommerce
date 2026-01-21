@@ -5,10 +5,10 @@ services:
     image: mysql:8.0
     container_name: ecommerce-mysql-dev
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: auth_db
-      MYSQL_USER: auth
-      MYSQL_PASSWORD: auth
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
@@ -30,10 +30,22 @@ services:
       # Chọn profile DEVELOPMENT
       SPRING_PROFILES_ACTIVE: dev
 
-      # Override nếu cần (optional vì đã có trong application-dev.yml)
-      SPRING_DATASOURCE_URL:  jdbc:mysql://mysql:3306/auth_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh
-      SPRING_DATASOURCE_USERNAME: auth
-      SPRING_DATASOURCE_PASSWORD: auth
+      # Database Configuration
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+
+      # Mail Configuration
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
+      JWT_VERIFICATION_EXPIRATION: ${JWT_VERIFICATION_EXPIRATION}
 
     ports:
       - "8080:8080"

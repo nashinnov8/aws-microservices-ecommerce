@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 
 
 @Service
@@ -73,6 +74,12 @@ public class AuthService {
                 .orElseThrow(() -> new UserNotExistException("User not found"));
 
         if (!encoder.matches(request.password(), user.getPasswordHash())) {
+            throw new UserNotExistException("Invalid credentials");
+        }
+
+        // check password if matched
+        String passwordHash = user.getPasswordHash();
+        if (!encoder.matches(request.password(), passwordHash)) {
             throw new UserNotExistException("Invalid credentials");
         }
 
@@ -233,5 +240,21 @@ public class AuthService {
         repository.save(user);
 
         log.info("Password reset successful for user: {}", user.getUsername());
+    }
+
+    public void changePassword(ChangePasswordRequest request) {
+        UserCredential user = repository.findById(UUID.fromString(request.userId()))
+                .orElseThrow(() -> new UserNotExistException("User not found"));
+
+        // Verify old password
+        if (!encoder.matches(request.oldPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Old password is incorrect");
+        }
+
+        // Update to new password
+        user.setPasswordHash(encoder.encode(request.newPassword()));
+        repository.save(user);
+
+        log.info("Password changed successfully for user: {}", user.getUsername());
     }
 }
