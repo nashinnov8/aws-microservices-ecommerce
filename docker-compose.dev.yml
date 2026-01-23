@@ -54,10 +54,31 @@ services:
         condition: service_healthy
     networks:
       - ecommerce-dev-network
+      -
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      AUTH_SERVICE_URL: http://auth-service:8080
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "7999:7999"
+    depends_on:
+      - redis
+      - auth-service
 
+  redis:
+    ports:
+      - "6379:6379"  # Expose for debugging
+    command: redis-server --appendonly yes
 networks:
   ecommerce-dev-network:
     driver: bridge
 
 volumes:
   mysql_dev_data:
+  redis_data:
