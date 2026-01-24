@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
@@ -21,6 +19,16 @@ services:
     networks:
       - ecommerce-dev-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis-dev
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecommerce-dev-network
   auth-service:
     build:
       context: .
@@ -54,7 +62,7 @@ services:
         condition: service_healthy
     networks:
       - ecommerce-dev-network
-      -
+
   api-gateway:
     build:
       context: .
@@ -70,11 +78,9 @@ services:
     depends_on:
       - redis
       - auth-service
+    networks:
+      - ecommerce-dev-network
 
-  redis:
-    ports:
-      - "6379:6379"  # Expose for debugging
-    command: redis-server --appendonly yes
 networks:
   ecommerce-dev-network:
     driver: bridge

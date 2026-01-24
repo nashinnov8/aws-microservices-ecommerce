@@ -49,7 +49,7 @@ spring:
             - JwtAuthentication
 
       default-filters:
-        - AddResponseHeader=X-Response-Time, ${responseTime}
+        - AddResponseHeader=X-Response-Time, static
         - AddResponseHeader=X-Environment, dev
 
 jwt:

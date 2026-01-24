@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
-import org.springframework.cloud.gateway.filter.factory.SetPathGatewayFilterFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -21,8 +20,8 @@ import java.util.List;
 
 @Component
 @Slf4j
-public class JwtAuthenticationFilter extends
-        AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
+public class JwtAuthenticationGatewayFilterFactory extends
+        AbstractGatewayFilterFactory<JwtAuthenticationGatewayFilterFactory.Config> {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
@@ -39,11 +38,11 @@ public class JwtAuthenticationFilter extends
 
     );
 
-    public JwtAuthenticationFilter() {
+    public JwtAuthenticationGatewayFilterFactory() {
         super(Config.class);
     }
     @Override
-    public GatewayFilter apply(JwtAuthenticationFilter.Config config) {
+    public GatewayFilter apply(JwtAuthenticationGatewayFilterFactory.Config config) {
         return (exchange, chain) -> {
             String path = exchange.getRequest().getPath().value();
 
