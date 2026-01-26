@@ -1,0 +1,95 @@
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 4
+          min-idle: 2
+
+  cloud:
+    gateway:
+      routes:
+        # Auth Service - Public Endpoints
+        - id: auth-service-public
+          uri: ${AUTH_SERVICE_URL:http://localhost:8080}
+          predicates:
+            - Path=/api/auth/login,/api/auth/register,/api/auth/forgot-password,/api/auth/verify-email,/api/auth/reset-password
+          filters:
+            - RewritePath=/api/auth/(?<segment>.*), /auth/$\{segment}
+
+        # Auth Service - Protected Endpoints
+        - id: auth-service-protected
+          uri: ${AUTH_SERVICE_URL:http://localhost:8080}
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - RewritePath=/api/auth/(?<segment>.*), /auth/$\{segment}
+            - JwtAuthentication
+
+        # Product Service (Local Development)
+        - id: product-service
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - RewritePath=/api/products/(?<segment>.*), /products/$\{segment}
+            - JwtAuthentication
+
+        # Inventory Service
+        - id: inventory-service
+          uri: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/inventory/**
+          filters:
+            - RewritePath=/api/inventory/(?<segment>.*), /api/inventory/$\{segment}
+            - JwtAuthentication
+
+      default-filters:
+        - AddResponseHeader=X-Response-Time, static
+        - AddResponseHeader=X-Environment, dev
+
+jwt:
+  secret: ${JWT_SECRET:Md2DcKtJIOAiWmkN3+VpZH6Eyu7fyZy03KB5hHyV5n4=}
+  expiration: 3600000  # 1 hour
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      authServiceCircuitBreaker:
+        baseConfig: default
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 70
+
+      productServiceCircuitBreaker:
+        baseConfig: default
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 70
+
+      inventoryServiceCircuitBreaker:
+        baseConfig: default
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 70
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,gateway,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: always
+
+server:
+  port: 7999
+
+logging:
+  level:
+    root: INFO
+    com.ecommerce.apigateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    reactor.netty.http.client: DEBUG
+    io.lettuce.core: DEBUG
