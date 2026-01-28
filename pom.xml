@@ -38,6 +38,7 @@
         <module>common</module>
         <module>auth-service</module>
         <module>api-gateway</module>
+        <module>product-service</module>
     </modules>
 
 </project>
