@@ -36,4 +36,11 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error(String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()), "An internal server error occurred"));
     }
+
+    @ExceptionHandler ResponseEntity<ApiResponse<Object>> handleWeakPasswordException(WeakPasswordException ex) {
+        log.warn("Weak password: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(String.valueOf(HttpStatus.BAD_REQUEST.value()), ex.getMessage()));
+    }
  }

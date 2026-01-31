@@ -2,6 +2,7 @@ package com.ecommerce.productservice.dto.producvariant;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.hibernate.validator.constraints.URL;
 
 import java.math.BigDecimal;
 
@@ -21,6 +22,7 @@ public record ProductVariantRequest(
 
         BigDecimal priceAdjustment,
 
+        @URL
         String imageUrl
 ) {
 }

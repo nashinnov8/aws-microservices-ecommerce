@@ -1,37 +1,42 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/auth_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh}
-    username: ${SPRING_DATASOURCE_USERNAME:auth}
-    password: ${SPRING_DATASOURCE_PASSWORD:auth}
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
 
   jpa:
     hibernate:
-      ddl-auto: update
-    database-platform: org.hibernate.dialect.MySQLDialect
-    show-sql: true
+      ddl-auto: ${JPA_HIBERNATE_DDL_AUTO}
+    database-platform: ${JPA_DATABASE_PLATFORM}
+    show-sql: ${JPA_SHOW_SQL}
     properties:
       hibernate:
-        format_sql: true
+        format_sql: ${JPA_FORMAT_SQL}
   mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
     username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
     properties:
         mail:
             smtp:
-                auth: true
+                auth: ${MAIL_SMTP_AUTH}
                 starttls:
-                    enable: true
-    default-encoding: utf-8
+                    enable: ${MAIL_SMTP_STARTTLS_ENABLE}
+    default-encoding: ${MAIL_DEFAULT_ENCODING}
 
 jwt:
-  secret: ${JWT_SECRET:Md2DcKtJIOAiWmkN3+VpZH6Eyu7fyZy03KB5hHyV5n4=}
-  expiration: ${JWT_EXPIRATION:3600000}  # 1 hour
-  expiration-refresh: ${JWT_REFRESH_EXPIRATION:86400000}  # 24 hours
-  verfication-expiration: ${JWT_VERIFICATION_EXPIRATION:3600000}
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION}
+  expiration-refresh: ${JWT_REFRESH_EXPIRATION}
+  verfication-expiration: ${JWT_VERIFICATION_EXPIRATION}
+  email-verification-expiration: ${JWT_EMAIL_VERIFICATION_EXPIRATION}
+  password-reset-expiration: ${JWT_PASSWORD_RESET_EXPIRATION}
 
 logging:
   level:
-    root: INFO
-    com.ecommerce.authservice: DEBUG
+    root: ${LOG_LEVEL_ROOT}
+    com.ecommerce.authservice: ${LOG_LEVEL_AUTH_SERVICE}
+
+app:
+  base-url: ${APP_BASE_URL}

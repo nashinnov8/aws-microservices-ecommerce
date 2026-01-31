@@ -13,6 +13,7 @@ import java.time.Duration;
 @Service
 
 public class TokenBlacklistService {
+    private static final String BLACKLIST_PREFIX = "blacklisted:token:";
     private final ReactiveRedisTemplate<String, String> redisTemplate;
 
     public TokenBlacklistService(
@@ -21,7 +22,7 @@ public class TokenBlacklistService {
     }
 
     public Mono<Boolean> blacklistToken(String token, long expirationMillis) {
-        String key = "blacklisted_token:" + token;
+        String key = BLACKLIST_PREFIX + token;
         Duration ttl = Duration.ofMillis(expirationMillis);
         return redisTemplate.opsForValue()
                 .set(key, "blacklisted", ttl)
@@ -30,12 +31,12 @@ public class TokenBlacklistService {
     }
 
     public Mono<Boolean> isBlacklisted(String token) {
-        String key = "blacklist:token:" + token;
+        String key = BLACKLIST_PREFIX + token;
         return redisTemplate.hasKey(key);
     }
 
     public Mono<Boolean> removeFromBlacklist(String token) {
-        String key = "blacklist:token:" + token;
+        String key = BLACKLIST_PREFIX + token;
         return redisTemplate.delete(key)
                 .map(count -> count > 0);
     }

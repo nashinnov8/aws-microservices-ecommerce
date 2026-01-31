@@ -7,6 +7,7 @@ import com.ecommerce.productservice.domain.repository.ProductRepository;
 import com.ecommerce.productservice.domain.repository.ProductVariantRepository;
 import com.ecommerce.productservice.dto.producvariant.ProductVariantRequest;
 import com.ecommerce.productservice.dto.producvariant.ProductVariantResponse;
+import com.ecommerce.productservice.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +28,7 @@ public class ProductVariantService {
     @Transactional
     public ProductVariantResponse create(UUID productId, ProductVariantRequest request) {
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + productId));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
 
         ProductVariant variant = new ProductVariant();
         variant.setVariantSku(request.variantSku());
@@ -46,7 +47,7 @@ public class ProductVariantService {
     @Transactional(readOnly = true)
     public List<ProductVariantResponse> getAllByProductId(UUID productId) {
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + productId));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
 
         return product.getVariants().stream()
                 .map(ProductVariantResponse::fromEntity)
@@ -56,14 +57,14 @@ public class ProductVariantService {
     @Transactional(readOnly = true)
     public ProductVariantResponse getById(UUID id) {
         ProductVariant variant = productVariantRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product variant not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Product variant not found with id: " + id));
         return ProductVariantResponse.fromEntity(variant);
     }
 
     @Transactional
     public ProductVariantResponse update(UUID id, ProductVariantRequest request) {
         ProductVariant variant = productVariantRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product variant not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Product variant not found with id: " + id));
 
         variant.setVariantSku(request.variantSku());
         variant.setSize(request.size());
@@ -79,7 +80,7 @@ public class ProductVariantService {
     @Transactional
     public void delete(UUID id) {
         ProductVariant variant = productVariantRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product variant not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Product variant not found with id: " + id));
         productVariantRepository.delete(variant);
     }
 }

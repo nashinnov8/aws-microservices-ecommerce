@@ -3,7 +3,7 @@ package com.ecommerce.productservice.dto.product;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
-import jakarta.validation.constraints.Size;
+import org.hibernate.validator.constraints.URL;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -22,12 +22,12 @@ public record ProductRequest(
 
         @Positive()
         BigDecimal price,
+
+        @URL
         String imageUrl,
 
-        @org.hibernate.validator.constraints.UUID
         UUID categoryId,
 
-        @org.hibernate.validator.constraints.UUID
         UUID brandId
 ) {
 }

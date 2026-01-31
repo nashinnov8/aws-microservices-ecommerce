@@ -4,6 +4,7 @@ import com.ecommerce.productservice.domain.entity.Brand;
 import com.ecommerce.productservice.domain.repository.BrandRepository;
 import com.ecommerce.productservice.dto.brand.BrandRequest;
 import com.ecommerce.productservice.dto.brand.BrandResponse;
+import com.ecommerce.productservice.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +26,7 @@ public class BrandService {
         brand.setDescription(request.description());
         brand.setLogoUrl(request.logoUrl());
         brand.setWebsiteUrl(request.websiteUrl());
-        brand.setActive(true);
+        brand.setIsActive(true);
 
         Brand savedBrand = brandRepository.save(brand);
         return BrandResponse.fromEntity(savedBrand);
@@ -41,14 +42,14 @@ public class BrandService {
     @Transactional(readOnly = true)
     public BrandResponse getById(UUID id) {
         Brand brand = brandRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Brand not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Brand not found with id: " + id));
         return BrandResponse.fromEntity(brand);
     }
 
     @Transactional
     public BrandResponse update(UUID id, BrandRequest request) {
         Brand brand = brandRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Brand not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Brand not found with id: " + id));
 
         brand.setName(request.name());
         brand.setDescription(request.description());
@@ -62,7 +63,7 @@ public class BrandService {
     @Transactional
     public void delete(UUID id) {
         Brand brand = brandRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Brand not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Brand not found with id: " + id));
         brandRepository.delete(brand);
     }
 }

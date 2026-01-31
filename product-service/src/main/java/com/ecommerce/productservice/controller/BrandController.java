@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import response.ApiResponse;
 
 import java.util.List;
 import java.util.UUID;
@@ -21,32 +22,32 @@ public class BrandController {
     }
 
     @PostMapping
-    public ResponseEntity<BrandResponse> createBrand(@Valid @RequestBody BrandRequest request) {
+    public ResponseEntity<ApiResponse<BrandResponse>> createBrand(@Valid @RequestBody BrandRequest request) {
         BrandResponse response = brandService.create(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("201", "Brand created successfully", response));
     }
 
     @GetMapping
-    public ResponseEntity<List<BrandResponse>> getAllBrands() {
+    public ResponseEntity<ApiResponse<List<BrandResponse>>> getAllBrands() {
         List<BrandResponse> response = brandService.getAll();
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("200", "Brands retrieved successfully", response));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<BrandResponse> getBrandById(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<BrandResponse>> getBrandById(@PathVariable UUID id) {
         BrandResponse response = brandService.getById(id);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("200", "Brand retrieved successfully", response));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<BrandResponse> updateBrand(@PathVariable UUID id, @Valid @RequestBody BrandRequest request) {
+    public ResponseEntity<ApiResponse<BrandResponse>> updateBrand(@PathVariable UUID id, @Valid @RequestBody BrandRequest request) {
         BrandResponse response = brandService.update(id, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("200", "Brand updated successfully", response));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteBrand(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Void>> deleteBrand(@PathVariable UUID id) {
         brandService.delete(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("200", "Brand deleted successfully", null));
     }
 }

@@ -2,6 +2,7 @@ package com.ecommerce.productservice.dto.category;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.hibernate.validator.constraints.URL;
 
 import java.util.UUID;
 
@@ -13,6 +14,7 @@ public record CategoryRequest(
         @Size(max = 500)
         String description,
 
+        @URL
         String imageUrl,
 
         UUID parentId

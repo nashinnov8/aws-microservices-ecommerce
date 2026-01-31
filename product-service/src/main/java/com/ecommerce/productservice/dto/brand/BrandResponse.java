@@ -22,7 +22,7 @@ public record BrandResponse(
                 brand.getDescription(),
                 brand.getLogoUrl(),
                 brand.getWebsiteUrl(),
-                brand.getActive(),
+                brand.getIsActive(),
                 brand.getCreatedAt(),
                 brand.getUpdatedAt()
         );

@@ -9,6 +9,7 @@ import com.ecommerce.authservice.domain.repository.UserCredentialRepository;
 import com.ecommerce.authservice.dto.*;
 import com.ecommerce.authservice.exception.UserAlreadyExistsException;
 import com.ecommerce.authservice.exception.UserNotExistException;
+import com.ecommerce.authservice.validation.PasswordValidator;
 import io.jsonwebtoken.Claims;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -30,13 +31,21 @@ public class AuthService {
     private final JwtProperties jwtProperties;
     private final EmailService emailService;
     private final String baseUrl = "http://localhost:8080";
-    public AuthService(UserCredentialRepository repository, JwtService jwtService, PasswordEncoder encoder, RefreshTokenRepository refreshTokenRepository, JwtProperties jwtProperties, EmailService service) {
+    private final PasswordValidator passwordValidator;
+    public AuthService(UserCredentialRepository repository,
+                       JwtService jwtService,
+                       PasswordEncoder encoder,
+                       RefreshTokenRepository refreshTokenRepository,
+                       JwtProperties jwtProperties,
+                       EmailService service,
+                       PasswordValidator passwordValidator) {
         this.repository = repository;
         this.jwtService = jwtService;
         this.encoder = encoder;
         this.refreshTokenRepository = refreshTokenRepository;
         this.jwtProperties = jwtProperties;
         this.emailService = service;
+        this.passwordValidator = passwordValidator;
     }
 
     public RegisterResponse register(RegisterRequest request) {
@@ -45,6 +54,8 @@ public class AuthService {
             throw new UserAlreadyExistsException("User already taken");
         }
 
+        // Password validation
+        passwordValidator.validate(request.password());
         // Registration logic here
         UserCredential userCredential = new UserCredential();
         userCredential.setUsername(request.username());
@@ -72,10 +83,6 @@ public class AuthService {
     public LoginResponse login(LoginRequest request, String ipAddress, String deviceInfo) {
         UserCredential user = repository.findByUsername(request.username())
                 .orElseThrow(() -> new UserNotExistException("User not found"));
-
-        if (!encoder.matches(request.password(), user.getPasswordHash())) {
-            throw new UserNotExistException("Invalid credentials");
-        }
 
         // check password if matched
         String passwordHash = user.getPasswordHash();

@@ -1,6 +1,7 @@
 package com.ecommerce.authservice.service;
 
 import com.ecommerce.authservice.config.JwtProperties;
+import com.ecommerce.authservice.constants.JwtConstants;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -26,8 +27,8 @@ public class JwtService {
     public String generateAccessToken(String userId, String role) {
         return Jwts.builder()
                 .subject(userId)
-                .claim("role", role)
-                .claim("type", "ACCESS")
+                .claim(JwtConstants.CLAIM_ROLE, role)
+                .claim(JwtConstants.CLAIM_TYPE, JwtConstants.TOKEN_TYPE_ACCESS)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + jwtProperties.getExpiration()))
                 .signWith(getSigningKey())
@@ -37,7 +38,7 @@ public class JwtService {
     public String generateRefreshToken(String userId) {
         return Jwts.builder()
                 .subject(userId)
-                .claim("type", "REFRESH")
+                .claim(JwtConstants.CLAIM_TYPE, JwtConstants.TOKEN_TYPE_REFRESH)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + jwtProperties.getExpirationRefresh()))
                 .signWith(getSigningKey())
@@ -47,9 +48,9 @@ public class JwtService {
     public String generateVerificationToken(String userId) {
         return Jwts.builder()
                 .subject(userId)
-                .claim("purpose", "EMAIL_VERIFICATION")
+                .claim(JwtConstants.CLAIM_PURPOSE, JwtConstants.TOKEN_PURPOSE_EMAIL_VERIFICATION)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 3600000))
+                .expiration(new Date(System.currentTimeMillis() + jwtProperties.getEmailVerificationExpiration()))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -57,9 +58,9 @@ public class JwtService {
     public String generatePasswordResetToken(String userId) {
         return Jwts.builder()
                 .subject(userId)
-                .claim("purpose", "PASSWORD_RESET")
+                .claim(JwtConstants.CLAIM_PURPOSE, JwtConstants.TOKEN_PURPOSE_PASSWORD_RESET)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 3600000)) // 1 hour
+                .expiration(new Date(System.currentTimeMillis() + jwtProperties.getPasswordResetExpiration()))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -72,15 +73,15 @@ public class JwtService {
                     .parseSignedClaims(token)
                     .getPayload();
 
-            String purpose = claims.get("purpose", String.class);
-//            log.info("Token purpose: {}", purpose);
-//            if (!"EMAIL_VERIFICATION".equals(purpose)) {
-//                throw new RuntimeException("Invalid token purpose");
-//            }
+            String purpose = claims.get(JwtConstants.CLAIM_PURPOSE, String.class);
+            log.info("Token purpose: {}", purpose);
+            if (!JwtConstants.TOKEN_PURPOSE_EMAIL_VERIFICATION.equals(purpose)) {
+                throw new RuntimeException(JwtConstants.INVALID_TOKEN_PURPOSE);
+            }
 
             return claims.getSubject();
         } catch (Exception e) {
-            throw new RuntimeException("Invalid or expired verification token", e);
+            throw new RuntimeException(JwtConstants.INVALID_OR_EXPIRED_VERIFICATION_TOKEN, e);
         }
     }
 
@@ -111,7 +112,7 @@ public class JwtService {
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
-            return expectedType.equals(claims.get("type"));
+            return expectedType.equals(claims.get(JwtConstants.CLAIM_TYPE));
         } catch (Exception e) {
             return false;
         }

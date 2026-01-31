@@ -4,6 +4,7 @@ import com.ecommerce.productservice.domain.entity.Category;
 import com.ecommerce.productservice.domain.repository.CategoryRepository;
 import com.ecommerce.productservice.dto.category.CategoryRequest;
 import com.ecommerce.productservice.dto.category.CategoryResponse;
+import com.ecommerce.productservice.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +29,7 @@ public class CategoryService {
 
         if (request.parentId() != null) {
             Category parent = categoryRepository.findById(request.parentId())
-                    .orElseThrow(() -> new RuntimeException("Parent category not found with id: " + request.parentId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent category not found with id: " + request.parentId()));
             category.setParent(parent);
         }
 
@@ -46,14 +47,14 @@ public class CategoryService {
     @Transactional(readOnly = true)
     public CategoryResponse getById(UUID id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
         return CategoryResponse.fromEntity(category);
     }
 
     @Transactional
     public CategoryResponse update(UUID id, CategoryRequest request) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
 
         category.setName(request.name());
         category.setDescription(request.description());
@@ -61,7 +62,7 @@ public class CategoryService {
 
         if (request.parentId() != null) {
             Category parent = categoryRepository.findById(request.parentId())
-                    .orElseThrow(() -> new RuntimeException("Parent category not found with id: " + request.parentId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent category not found with id: " + request.parentId()));
             category.setParent(parent);
         } else {
             category.setParent(null);
@@ -74,7 +75,7 @@ public class CategoryService {
     @Transactional
     public void delete(UUID id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
         categoryRepository.delete(category);
     }
 }
