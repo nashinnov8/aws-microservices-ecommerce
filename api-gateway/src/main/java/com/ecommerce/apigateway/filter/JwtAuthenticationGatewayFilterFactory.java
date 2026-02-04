@@ -1,5 +1,6 @@
 package com.ecommerce.apigateway.filter;
 
+import com.ecommerce.apigateway.service.TokenBlacklistService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -25,6 +26,8 @@ public class JwtAuthenticationGatewayFilterFactory extends
     @Value("${jwt.secret}")
     private String jwtSecret;
 
+    private final TokenBlacklistService tokenBlacklistService;
+
     // The public endpoints that do not require JWT authentication
     private static final List<String> PUBLIC_ENDPOINTS = List.of(
             "/auth/login",
@@ -33,13 +36,14 @@ public class JwtAuthenticationGatewayFilterFactory extends
             "/auth/verify-email",
             "/auth/forgot-password",
             "/auth/reset-password",
+            "/fallback/auth/logout",
             "actuator/health",
             "actuator/prometheus"
-
     );
 
-    public JwtAuthenticationGatewayFilterFactory() {
+    public JwtAuthenticationGatewayFilterFactory(TokenBlacklistService tokenBlacklistService) {
         super(Config.class);
+        this.tokenBlacklistService = tokenBlacklistService;
     }
     @Override
     public GatewayFilter apply(JwtAuthenticationGatewayFilterFactory.Config config) {
@@ -59,19 +63,30 @@ public class JwtAuthenticationGatewayFilterFactory extends
             }
 
             String token = authHeader.substring(7);
-            try {
-                Claims claims = validateToken(token);
 
-                ServerHttpRequest request = exchange.getRequest()
-                        .mutate()
-                        .header("X-User-Id", claims.getSubject())
-                        .header("X-User-Role", claims.get("role", String.class))
-                        .build();
+            //  Check if token is blacklisted BEFORE validating JWT
+            return tokenBlacklistService.isBlacklisted(token)
+                    .flatMap(isBlacklisted -> {
+                        if (isBlacklisted) {
+                            log.warn("Request with blacklisted token rejected for path: {}", path);
+                            return onError(exchange, "Token has been revoked", HttpStatus.UNAUTHORIZED);
+                        }
 
-                return chain.filter(exchange.mutate().request(request).build());
-            } catch (Exception e) {
-                log.error("JWT validation failed: {}", e.getMessage());
-                return onError(exchange, "Invalid JWT token", HttpStatus.UNAUTHORIZED);            }
+                        try {
+                            Claims claims = validateToken(token);
+
+                            ServerHttpRequest request = exchange.getRequest()
+                                    .mutate()
+                                    .header("X-User-Id", claims.getSubject())
+                                    .header("X-User-Role", claims.get("role", String.class))
+                                    .build();
+
+                            return chain.filter(exchange.mutate().request(request).build());
+                        } catch (Exception e) {
+                            log.error("JWT validation failed: {}", e.getMessage());
+                            return onError(exchange, "Invalid JWT token", HttpStatus.UNAUTHORIZED);
+                        }
+                    });
         };
     }
     private Claims validateToken(String token) {

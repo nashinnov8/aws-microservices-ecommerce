@@ -11,6 +11,7 @@ import com.ecommerce.productservice.dto.product.GetProductRequest;
 import com.ecommerce.productservice.dto.product.ProductRequest;
 import com.ecommerce.productservice.dto.product.ProductResponse;
 import com.ecommerce.productservice.exception.ResourceNotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
@@ -35,6 +37,8 @@ public class ProductService {
 
     @Transactional
     public ProductResponse create(ProductRequest request) {
+        log.info("Creating product with name: {} and SKU: {}", request.name(), request.baseSku());
+
         Product product = new Product();
         product.setName(request.name());
         product.setDescription(request.description());
@@ -56,6 +60,7 @@ public class ProductService {
         }
 
         Product savedProduct = productRepository.save(product);
+        log.info("Product created successfully with id: {}", savedProduct.getId());
         return ProductResponse.fromEntity(savedProduct);
     }
 
@@ -83,6 +88,7 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public ProductResponse getById(UUID id) {
+        log.debug("Fetching product with id: {}", id);
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
         return ProductResponse.fromEntity(product);
@@ -90,6 +96,7 @@ public class ProductService {
 
     @Transactional
     public ProductResponse update(UUID id, ProductRequest request) {
+        log.info("Updating product with id: {}", id);
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
 
@@ -107,14 +114,26 @@ public class ProductService {
             product.setCategory(null);
         }
 
+        // Update brand
+        if (request.brandId() != null) {
+            Brand brand = brandRepository.findById(request.brandId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Brand not found with id: " + request.brandId()));
+            product.setBrand(brand);
+        } else {
+            product.setBrand(null);
+        }
+
         Product updatedProduct = productRepository.save(product);
+        log.info("Product updated successfully with id: {}", id);
         return ProductResponse.fromEntity(updatedProduct);
     }
 
     @Transactional
     public void delete(UUID id) {
+        log.info("Deleting product with id: {}", id);
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
         productRepository.delete(product);
+        log.info("Product deleted successfully with id: {}", id);
     }
 }

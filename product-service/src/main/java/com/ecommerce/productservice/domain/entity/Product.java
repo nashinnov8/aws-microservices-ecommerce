@@ -24,7 +24,8 @@ public class Product extends BaseEntity{
     @Column(nullable = false)
     private String name;
 
-    @Size(max = 100)
+    @Size(max = 2000)
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @NotBlank(message = "Base SKU is required")

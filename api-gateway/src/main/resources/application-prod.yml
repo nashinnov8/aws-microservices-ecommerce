@@ -125,8 +125,11 @@ logging:
     org.springframework.cloud.gateway: INFO
   file:
     name: /var/log/api-gateway/application.log
-    max-size: 10MB
     max-history: 30
-    
+
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 10
 server:
   port: 7999
