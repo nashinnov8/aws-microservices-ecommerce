@@ -5,6 +5,7 @@ import com.ecommerce.productservice.domain.repository.BrandRepository;
 import com.ecommerce.productservice.dto.brand.BrandRequest;
 import com.ecommerce.productservice.dto.brand.BrandResponse;
 import com.ecommerce.productservice.exception.ResourceNotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class BrandService {
     private final BrandRepository brandRepository;
 
@@ -21,6 +23,8 @@ public class BrandService {
 
     @Transactional
     public BrandResponse create(BrandRequest request) {
+        log.info("Creating brand with name: {}", request.name());
+
         Brand brand = new Brand();
         brand.setName(request.name());
         brand.setDescription(request.description());
@@ -29,11 +33,13 @@ public class BrandService {
         brand.setIsActive(true);
 
         Brand savedBrand = brandRepository.save(brand);
+        log.info("Brand created successfully with id: {}", savedBrand.getId());
         return BrandResponse.fromEntity(savedBrand);
     }
 
     @Transactional(readOnly = true)
     public List<BrandResponse> getAll() {
+        log.debug("Fetching all brands");
         return brandRepository.findAll().stream()
                 .map(BrandResponse::fromEntity)
                 .toList();
@@ -41,6 +47,7 @@ public class BrandService {
 
     @Transactional(readOnly = true)
     public BrandResponse getById(UUID id) {
+        log.debug("Fetching brand with id: {}", id);
         Brand brand = brandRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Brand not found with id: " + id));
         return BrandResponse.fromEntity(brand);

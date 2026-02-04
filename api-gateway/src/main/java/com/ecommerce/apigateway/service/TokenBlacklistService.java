@@ -26,13 +26,20 @@ public class TokenBlacklistService {
         Duration ttl = Duration.ofMillis(expirationMillis);
         return redisTemplate.opsForValue()
                 .set(key, "blacklisted", ttl)
+                .timeout(Duration.ofSeconds(2))
+                .retry(2)
+                .onErrorReturn(false)
                 .doOnSuccess(success -> log.info("Token blacklisted: {}", token))
                 .doOnError(error -> log.error("Error blacklisting token: {}", token, error));
     }
 
     public Mono<Boolean> isBlacklisted(String token) {
         String key = BLACKLIST_PREFIX + token;
-        return redisTemplate.hasKey(key);
+
+        return redisTemplate.hasKey(key)
+                .timeout(Duration.ofSeconds(1))
+                .onErrorReturn(false)  // If Redis fails, assume NOT blacklisted (safe default)
+                .doOnError(error -> log.warn("Error checking blacklist for token, defaulting to safe: {}", token));
     }
 
     public Mono<Boolean> removeFromBlacklist(String token) {

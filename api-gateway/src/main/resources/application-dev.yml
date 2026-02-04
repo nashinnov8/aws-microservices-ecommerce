@@ -19,6 +19,10 @@ spring:
           predicates:
             - Path=/api/auth/login,/api/auth/register,/api/auth/forgot-password,/api/auth/verify-email,/api/auth/reset-password
           filters:
+            - name: CircuitBreaker
+              args:
+                name: authServiceCircuitBreaker
+                fallbackUri: forward:/fallback/auth
             - name: RequestRateLimiter
               args:
                 redis-rate-limiter:
@@ -27,12 +31,30 @@ spring:
                 key-resolver: userKeyResolver
             - RewritePath=/api/auth/(?<segment>.*), /auth/$\{segment}
 
+        # Logout Endpoint - Gateway level (always available)
+        - id: logout
+          uri: forward:///fallback/auth/logout
+          predicates:
+            - Path=/api/auth/logout
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter:
+                    replenishRate: 10
+                    requestedTokens: 1
+                key-resolver: userKeyResolver
+            - Method=POST
+
         # Auth Service - Protected Endpoints
         - id: auth-service-protected
           uri: ${AUTH_SERVICE_URL:http://localhost:8080}
           predicates:
             - Path=/api/auth/**
           filters:
+            - name: CircuitBreaker
+              args:
+                name: authServiceCircuitBreaker
+                fallbackUri: forward:/fallback/auth
             - RewritePath=/api/auth/(?<segment>.*), /auth/$\{segment}
             - JwtAuthentication
 
@@ -42,7 +64,10 @@ spring:
           predicates:
             - Path=/api/products/**,/api/categories/**,/api/brands/**
           filters:
-#            - RewritePath=/api/products/(?<segment>.*), /products/$\{segment}
+            - name: CircuitBreaker
+              args:
+                name: productServiceCircuitBreaker
+                fallbackUri: forward:/fallback/products
             - JwtAuthentication
 
         # Inventory Service
@@ -51,6 +76,10 @@ spring:
           predicates:
             - Path=/api/inventory/**
           filters:
+            - name: CircuitBreaker
+              args:
+                name: inventoryServiceCircuitBreaker
+                fallbackUri: forward:/fallback/inventory
             - RewritePath=/api/inventory/(?<segment>.*), /api/inventory/$\{segment}
             - JwtAuthentication
 
