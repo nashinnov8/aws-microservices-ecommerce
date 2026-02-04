@@ -11,6 +11,7 @@ services:
       - "3306:3306"
     volumes:
       - mysql_dev_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
     healthcheck:
       test:  ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -63,6 +64,28 @@ services:
     networks:
       - ecommerce-dev-network
 
+  product-service:
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+    container_name: product-service-dev
+    environment:
+      # Profile DEVELOPMENT
+      SPRING_PROFILES_ACTIVE: dev
+
+      # Database Configuration
+      SPRING_DATASOURCE_URL: ${PRODUCT_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${PRODUCT_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${PRODUCT_DATASOURCE_PASSWORD}
+
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - ecommerce-dev-network
+
   api-gateway:
     build:
       context: .
@@ -70,6 +93,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       AUTH_SERVICE_URL: http://auth-service:8080
+      PRODUCT_SERVICE_URL: http://product-service:8081
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET}
@@ -78,6 +102,7 @@ services:
     depends_on:
       - redis
       - auth-service
+      - product-service
     networks:
       - ecommerce-dev-network
 

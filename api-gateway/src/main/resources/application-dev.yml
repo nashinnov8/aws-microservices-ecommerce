@@ -19,6 +19,12 @@ spring:
           predicates:
             - Path=/api/auth/login,/api/auth/register,/api/auth/forgot-password,/api/auth/verify-email,/api/auth/reset-password
           filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter:
+                    replenishRate: 10
+                    requestedTokens: 1
+                key-resolver: userKeyResolver
             - RewritePath=/api/auth/(?<segment>.*), /auth/$\{segment}
 
         # Auth Service - Protected Endpoints
@@ -34,9 +40,9 @@ spring:
         - id: product-service
           uri: ${PRODUCT_SERVICE_URL:http://localhost:8081}
           predicates:
-            - Path=/api/products/**
+            - Path=/api/products/**,/api/categories/**,/api/brands/**
           filters:
-            - RewritePath=/api/products/(?<segment>.*), /products/$\{segment}
+#            - RewritePath=/api/products/(?<segment>.*), /products/$\{segment}
             - JwtAuthentication
 
         # Inventory Service
