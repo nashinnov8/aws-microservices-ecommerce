@@ -144,20 +144,4 @@ public interface StockReservationRepository extends JpaRepository<StockReservati
     List<StockReservation> findReservationsExpiringSoon(
             @Param("startTime") Instant startTime,
             @Param("endTime") Instant endTime);
-
-    /**
-     * Find all reservations with any of the given statuses.
-     *
-     * @param statuses List of statuses to filter by
-     * @return List of reservations with specified statuses
-     */
-    List<StockReservation> findByStatusIn(List<ReservationStatus> statuses);
-
-    /**
-     * Find all reservations that have expired (expiresAt is before given time).
-     *
-     * @param time The time threshold
-     * @return List of reservations that expired before the given time
-     */
-    List<StockReservation> findByExpiresAtBefore(Instant time);
 }

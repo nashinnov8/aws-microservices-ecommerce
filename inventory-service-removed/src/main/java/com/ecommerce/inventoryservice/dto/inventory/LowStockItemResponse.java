@@ -12,6 +12,7 @@ import java.util.UUID;
  * @param variantName Variant name for display
  * @param availableStock Current available stock
  * @param reorderPoint The threshold that was breached
+ * @param suggestedReorderQuantity Suggested quantity to order (maxStockLevel - availableStock)
  */
 public record LowStockItemResponse(
         UUID id,
@@ -19,5 +20,6 @@ public record LowStockItemResponse(
         String productName,
         String variantName,
         int availableStock,
-        int reorderPoint
+        int reorderPoint,
+        int suggestedReorderQuantity
 ) {}

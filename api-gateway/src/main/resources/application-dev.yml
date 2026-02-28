@@ -80,8 +80,10 @@ spring:
               args:
                 name: inventoryServiceCircuitBreaker
                 fallbackUri: forward:/fallback/inventory
+                requiredRoles: ROLE_ADMIN, ROLE_INVENTORY_MANAGER
             - RewritePath=/api/inventory/(?<segment>.*), /api/inventory/$\{segment}
             - JwtAuthentication
+
 
       default-filters:
         - AddResponseHeader=X-Response-Time, static

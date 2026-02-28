@@ -27,7 +27,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-public class  StockReservation extends BaseEntity {
+public class StockReservation extends BaseEntity {
 
     /**
      * Reference to the inventory item being reserved.

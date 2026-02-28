@@ -1,1 +1,2 @@
-response/PageResponse.class
+response\ApiResponse.class
+response\PageResponse.class

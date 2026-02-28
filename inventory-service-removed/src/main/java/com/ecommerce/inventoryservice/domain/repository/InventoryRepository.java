@@ -121,15 +121,4 @@ public interface InventoryRepository extends JpaRepository<Inventory, UUID> {
      * @return Optional containing the inventory if found and active
      */
     Optional<Inventory> findBySkuAndIsActiveTrue(String sku);
-
-    /**
-     * Find inventory by ID with pessimistic lock for concurrent updates.
-     * Use this method when updating stock by ID to prevent race conditions.
-     *
-     * @param id The inventory ID
-     * @return Optional containing the inventory if found
-     */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT i FROM Inventory i WHERE i.id = :id")
-    Optional<Inventory> findByIdForUpdate(@Param("id") UUID id);
 }

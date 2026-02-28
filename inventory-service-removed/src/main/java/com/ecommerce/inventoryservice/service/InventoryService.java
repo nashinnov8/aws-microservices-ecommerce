@@ -5,10 +5,10 @@ import com.ecommerce.inventoryservice.domain.entity.StockMovement;
 import com.ecommerce.inventoryservice.domain.enums.MovementType;
 import com.ecommerce.inventoryservice.domain.repository.InventoryRepository;
 import com.ecommerce.inventoryservice.domain.repository.StockMovementRepository;
-import com.ecommerce.inventoryservice.dto.inventory.*;
+import com.ecommerce.inventoryservice.dto.inventory.StockInfoResponse;
+import com.ecommerce.inventoryservice.dto.inventory.UpdateStockRequest;
 import com.ecommerce.inventoryservice.exception.InventoryNotFoundException;
 import com.ecommerce.inventoryservice.kafka.InventoryEventProducer;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -106,7 +106,7 @@ public class InventoryService {
     }
 
     /**
-     * Get all stock information for a given sku .
+     * Get all stock information for a given product ID.
      *
      * @param productId UUID of the product in product-service
      * @return List of StockInfoResponse for all variants of the product
@@ -117,13 +117,6 @@ public class InventoryService {
                 .stream()
                 .map(this::mapToStockInfoResponse)
                 .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public StockInfoResponse getStockBySku(String sku) {
-        Inventory inventory = inventoryRepository.findBySku(sku)
-                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found for SKU: " + sku));
-        return mapToStockInfoResponse(inventory);
     }
 
     /**
@@ -248,72 +241,5 @@ public class InventoryService {
 
     private boolean wasAlreadyLowStock(int previousStock, int reorderPoint) {
         return previousStock <= reorderPoint;
-    }
-
-    public List<LowStockItemResponse> getLowStockItems() {
-        return inventoryRepository.findLowStockItems()
-                .stream()
-                .map(inventory -> new LowStockItemResponse(
-                        inventory.getId(),
-                        inventory.getSku(),
-                        inventory.getProductName(),
-                        inventory.getVariantName(),
-                        inventory.getAvailableStock(),
-                        inventory.getReorderPoint()
-                ))
-                .collect(Collectors.toList());
-    }
-
-    public BulkStockCheckResponse checkAvailability(@Valid BulkStockCheckRequest request) {
-        List<BulkStockCheckResponse.StockCheckResult> items = request.items().stream()
-                .map(item -> {
-                    Optional<Inventory> inventoryOpt = inventoryRepository.findBySku(item.sku());
-                    if (inventoryOpt.isPresent()) {
-                        Inventory inventory = inventoryOpt.get();
-                        int availableQty = inventory.getAvailableStock();
-                        boolean isAvailable = availableQty >= item.requestedQuantity();
-                        int shortfall = isAvailable ? 0 : (item.requestedQuantity() - availableQty);
-
-                        return new BulkStockCheckResponse.StockCheckResult(
-                                item.sku(),
-                                item.requestedQuantity(),
-                                availableQty,
-                                isAvailable,
-                                shortfall
-                        );
-                    } else {
-                        int shortfall = item.requestedQuantity();
-                        return new BulkStockCheckResponse.StockCheckResult(
-                                item.sku(),
-                                item.requestedQuantity(),
-                                0,
-                                false,
-                                shortfall
-                        );
-                    }
-                })
-                .collect(Collectors.toList());
-
-        // Check if all items are available
-        boolean allAvailable = items.stream().allMatch(BulkStockCheckResponse.StockCheckResult::isAvailable);
-
-        return new BulkStockCheckResponse(allAvailable, items);
-    }
-
-    public void deactivateInventory(String sku) {
-        Inventory inventory = inventoryRepository.findBySku(sku)
-                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found with sku: " + sku));
-        inventory.setActive(false);
-        inventoryRepository.save(inventory);
-        log.info("Deactivated inventory with sku: {}", sku);
-    }
-
-    public void updateInventoryMetadata(UUID uuid, String productName, String variantName) {
-        Inventory inventory = inventoryRepository.findById(uuid)
-                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found with id: " + uuid));
-        inventory.setProductName(productName);
-        inventory.setVariantName(variantName);
-        inventoryRepository.save(inventory);
-        log.info("Updated inventory metadata for id: {}", uuid);
     }
 }
