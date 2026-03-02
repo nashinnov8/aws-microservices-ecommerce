@@ -6,6 +6,7 @@ import com.ecommerce.inventoryservice.domain.enums.MovementType;
 import com.ecommerce.inventoryservice.domain.repository.InventoryRepository;
 import com.ecommerce.inventoryservice.domain.repository.StockMovementRepository;
 import com.ecommerce.inventoryservice.dto.inventory.*;
+import com.ecommerce.inventoryservice.exception.InsufficientStockException;
 import com.ecommerce.inventoryservice.exception.InventoryNotFoundException;
 import com.ecommerce.inventoryservice.kafka.InventoryEventProducer;
 import jakarta.validation.Valid;
@@ -128,7 +129,9 @@ public class InventoryService {
 
     /**
      * Update stock quantity for a SKU.
-     * Checking for low stock alerts after update.
+     * Uses atomic SQL for ADD/SUBTRACT (race-condition-free).
+     * Uses pessimistic lock for SET (requires fetch-modify-save).
+     * Checks for low stock alerts after update.
      *
      * @param sku Item SKU
      * @param request UpdateStockRequest containing operation, quantity, reason, performedBy
@@ -136,32 +139,48 @@ public class InventoryService {
      */
     @Transactional
     public StockInfoResponse updateStock(String sku, UpdateStockRequest request) {
-        Inventory inventory = inventoryRepository.findBySkuForUpdate(sku)
+        // First, get the current state for audit trail (before the update)
+        Inventory beforeUpdate = inventoryRepository.findBySku(sku)
                 .orElseThrow(() -> new InventoryNotFoundException("Inventory not found for SKU: " + sku));
+        int previousStock = beforeUpdate.getAvailableStock();
 
-        int previousStock = inventory.getAvailableStock();
+        int updated;
         int newStock;
 
-        // Switch case for update stock based on OPERATION request
         switch (request.operation()) {
-            case ADD:
+            case ADD -> {
+                updated = inventoryRepository.atomicAddStock(sku, request.quantity());
                 newStock = previousStock + request.quantity();
-                break;
-            case SUBTRACT:
+            }
+            case SUBTRACT -> {
+                updated = inventoryRepository.atomicDeductStock(sku, request.quantity());
                 newStock = previousStock - request.quantity();
-                break;
-            case SET:
+            }
+            case SET -> {
+                // SET requires fetch-modify-save — use pessimistic lock
+                Inventory inv = inventoryRepository.findBySkuForUpdate(sku)
+                        .orElseThrow(() -> new InventoryNotFoundException("Inventory not found for SKU: " + sku));
+                inv.setAvailableStock(request.quantity());
+                inventoryRepository.save(inv);
+                updated = 1;
                 newStock = request.quantity();
-                break;
-            default:
-                throw new IllegalArgumentException("Invalid stock update operation: " + request.operation());
+            }
+            default -> throw new IllegalArgumentException("Invalid stock update operation: " + request.operation());
         }
 
-        // Update inventory stock
-        inventory.setAvailableStock(newStock);
-        Inventory saved = inventoryRepository.save(inventory);
+        if (updated == 0) {
+            throw new InsufficientStockException(
+                    "Stock update failed for SKU: " + sku +
+                    ". Operation: " + request.operation() +
+                    ", Quantity: " + request.quantity() +
+                    ", Available: " + previousStock);
+        }
 
-        // Record stock movement type for audit trail
+        // Re-fetch the updated entity for response and event publishing
+        Inventory saved = inventoryRepository.findBySku(sku)
+                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found for SKU: " + sku));
+
+        // Record stock movement for audit trail
         StockMovement movement = new StockMovement(
                 saved.getId(),
                 MovementType.ADJUST,
@@ -300,11 +319,18 @@ public class InventoryService {
         return new BulkStockCheckResponse(allAvailable, items);
     }
 
+    /**
+     * Deactivate inventory for a SKU (soft delete).
+     * Uses atomic query — no fetch-modify-save needed.
+     *
+     * @param sku The SKU to deactivate
+     */
+    @Transactional
     public void deactivateInventory(String sku) {
-        Inventory inventory = inventoryRepository.findBySku(sku)
-                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found with sku: " + sku));
-        inventory.setActive(false);
-        inventoryRepository.save(inventory);
+        int updated = inventoryRepository.atomicDeactivate(sku);
+        if (updated == 0) {
+            throw new InventoryNotFoundException("Inventory not found with sku: " + sku);
+        }
         log.info("Deactivated inventory with sku: {}", sku);
     }
 

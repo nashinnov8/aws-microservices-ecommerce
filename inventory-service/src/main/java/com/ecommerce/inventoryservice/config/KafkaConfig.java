@@ -161,10 +161,11 @@ public class KafkaConfig {
     }
 
     /**
-     * Kafka listener container factory with manual acknowledgment.
+     * Kafka listener container factory for ProductEvent consumers.
+     * Referenced by @KafkaListener(containerFactory = "productEventListenerContainerFactory")
      */
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, ProductEvent> kafkaListenerContainerFactory(
+    public ConcurrentKafkaListenerContainerFactory<String, ProductEvent> productEventListenerContainerFactory(
             ConsumerFactory<String, ProductEvent> productEventConsumerFactory) {
         ConcurrentKafkaListenerContainerFactory<String, ProductEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
@@ -175,6 +176,47 @@ public class KafkaConfig {
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
                 (consumerRecord, exception) -> {
                     // Runs after all retries are exhausted
+                },
+                new FixedBackOff(1000L, 3L)
+        );
+        factory.setCommonErrorHandler(errorHandler);
+
+        return factory;
+    }
+
+    // ==================== ORDER EVENT CONSUMER ====================
+
+    /**
+     * Consumer configuration for OrderEvent (String deserialization).
+     * Consumes events from order-service.
+     */
+    @Bean
+    public ConsumerFactory<String, String> orderEventConsumerFactory() {
+        Map<String, Object> configProps = new HashMap<>();
+        configProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        configProps.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        configProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        configProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+
+        return new DefaultKafkaConsumerFactory<>(configProps, new StringDeserializer(), new StringDeserializer());
+    }
+
+    /**
+     * Kafka listener container factory for OrderEvent consumers.
+     * Referenced by @KafkaListener(containerFactory = "orderEventListenerContainerFactory")
+     */
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, String> orderEventListenerContainerFactory(
+            ConsumerFactory<String, String> orderEventConsumerFactory) {
+        ConcurrentKafkaListenerContainerFactory<String, String> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+
+        factory.setConsumerFactory(orderEventConsumerFactory);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(
+                (consumerRecord, exception) -> {
+                    // Runs after all retries are exhausted - send to DLQ in production
                 },
                 new FixedBackOff(1000L, 3L)
         );

@@ -16,12 +16,18 @@ import java.util.UUID;
  * SKU is the primary business key used for all operations.
  */
 @Entity
-@Table(name = "inventory", indexes = {
-    @Index(name = "idx_inventory_sku", columnList = "sku"),
-    @Index(name = "idx_inventory_variant_id", columnList = "variantId"),
-    @Index(name = "idx_inventory_product_id", columnList = "productId"),
-    @Index(name = "idx_inventory_is_active", columnList = "isActive")
-})
+@Table(name = "inventory",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_inventory_sku", columnNames = "sku"),
+        @UniqueConstraint(name = "uk_inventory_variant", columnNames = {"productId", "variantId"})
+    },
+    indexes = {
+        @Index(name = "idx_inventory_sku", columnList = "sku"),
+        @Index(name = "idx_inventory_variant_id", columnList = "variantId"),
+        @Index(name = "idx_inventory_product_id", columnList = "productId"),
+        @Index(name = "idx_inventory_is_active", columnList = "isActive")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

@@ -2,8 +2,10 @@ package com.ecommerce.inventoryservice.exception;
 
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -164,6 +166,37 @@ public class GlobalExceptionHandler {
         ApiResponse<Map<String, String>> response = ApiResponse.success(
                 "VALIDATION_ERROR", errorMessage, errors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    // ==================== Concurrency Exception Handlers ====================
+
+    /**
+     * Handle optimistic locking failures (version conflicts).
+     * Occurs when two requests try to update the same entity simultaneously.
+     * Returns 409 Conflict — client should retry.
+     */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOptimisticLockingFailure(
+            ObjectOptimisticLockingFailureException ex) {
+        log.warn("Optimistic locking conflict: {}", ex.getMessage());
+        ApiResponse<Void> response = ApiResponse.error(
+                "VERSION_CONFLICT",
+                "Resource was modified by another request. Please retry.");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /**
+     * Handle data integrity violations (unique constraint violations, FK violations).
+     * Returns 409 Conflict.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMessage());
+        ApiResponse<Void> response = ApiResponse.error(
+                "DATA_INTEGRITY_ERROR",
+                "A data integrity constraint was violated. The record may already exist.");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
     // ==================== Generic Exception Handlers ====================

@@ -50,8 +50,11 @@ public class ReservationService {
     private static final long RESERVATION_EXPIRY_MINUTES = 15;
 
     /**
-     * Reserve stock for an order. Uses pessimistic locking to prevent race conditions.
-     * Creates PENDING reservations and deducts from availableStock.
+     * Reserve stock for an order. Uses atomic SQL queries to prevent race conditions.
+     * Creates ACTIVE reservations and atomically deducts from availableStock.
+     *
+     * SKUs are sorted alphabetically before locking to prevent deadlocks
+     * when multiple threads reserve overlapping SKUs.
      *
      * @param orderId Order ID
      * @param items List of items to reserve (SKU + quantity pairs)
@@ -63,50 +66,42 @@ public class ReservationService {
     public List<StockReservation> reserveStock(String orderId, List<BulkStockCheckRequest.StockCheckItem> items) {
         log.info("Attempting to reserve stock for order: {} with {} items", orderId, items.size());
 
+        // Sort SKUs alphabetically to prevent deadlocks
+        List<BulkStockCheckRequest.StockCheckItem> sortedItems = items.stream()
+                .sorted((a, b) -> a.sku().compareTo(b.sku()))
+                .collect(Collectors.toList());
+
         List<StockReservation> createdReservations = new ArrayList<>();
 
-        // First, check all items are available (fail-fast)
-        for (BulkStockCheckRequest.StockCheckItem item : items) {
-            Inventory inventory = inventoryRepository.findBySkuForUpdate(item.sku())
+        for (BulkStockCheckRequest.StockCheckItem item : sortedItems) {
+            // Look up inventory (read-only, for ID and event data)
+            Inventory inventory = inventoryRepository.findBySku(item.sku())
                     .orElseThrow(() -> new InventoryNotFoundException("Inventory not found for SKU: " + item.sku()));
 
-            int availableForReservation = inventory.getAvailableStock();
-            if (availableForReservation < item.requestedQuantity()) {
-                log.warn("Insufficient stock for SKU: {}. Available: {}, Requested: {}",
-                    item.sku(), availableForReservation, item.requestedQuantity());
+            // Atomic reserve — single SQL statement, no race condition
+            int updated = inventoryRepository.atomicReserveStock(inventory.getId(), item.requestedQuantity());
+
+            if (updated == 0) {
+                log.warn("Insufficient stock for SKU: {}. Requested: {}",
+                        item.sku(), item.requestedQuantity());
                 throw new InsufficientStockException(
-                    "Insufficient stock for SKU: " + item.sku() +
-                    ". Available: " + availableForReservation +
-                    ", Requested: " + item.requestedQuantity()
+                        item.sku(), item.requestedQuantity(), inventory.getAvailableStock()
                 );
             }
-        }
 
-        // All checks passed, proceed with reservation
-        for (BulkStockCheckRequest.StockCheckItem item : items) {
-            Inventory inventory = inventoryRepository.findBySkuForUpdate(item.sku())
-                    .orElseThrow(() -> new InventoryNotFoundException("Inventory not found for SKU: " + item.sku()));
-
-            // Create reservation
+            // Create reservation record
             StockReservation reservation = new StockReservation();
             reservation.setInventoryId(inventory.getId());
             reservation.setOrderId(orderId);
             reservation.setQuantity(item.requestedQuantity());
             reservation.setStatus(ReservationStatus.ACTIVE);
-
-            // Set expiry time to 15 minutes from now
             reservation.setExpiresAt(Instant.now().plusSeconds(RESERVATION_EXPIRY_MINUTES * 60));
 
             StockReservation savedReservation = stockReservationRepository.save(reservation);
             createdReservations.add(savedReservation);
 
-            // Deduct from available stock
-            inventory.setAvailableStock(inventory.getAvailableStock() - item.requestedQuantity());
-            inventory.setReservedStock(inventory.getReservedStock() + item.requestedQuantity());
-            inventoryRepository.save(inventory);
-
             log.info("Reserved {} units of SKU: {} for order: {}",
-                item.requestedQuantity(), item.sku(), orderId);
+                    item.requestedQuantity(), item.sku(), orderId);
 
             // Publish event
             eventProducer.publishStockReserved(inventory.getId(), inventory.getSku(), inventory.getVariantId(),
@@ -119,7 +114,7 @@ public class ReservationService {
 
     /**
      * Release a reservation (called on payment failure or order cancellation).
-     * Changes status to RELEASED and restores availableStock.
+     * Uses atomic queries for both reservation status update and stock restoration.
      *
      * @param reservationId ID of the reservation to release
      * @param reason Reason for release (e.g., "PAYMENT_FAILED", "ORDER_CANCELLED")
@@ -132,21 +127,25 @@ public class ReservationService {
         StockReservation reservation = stockReservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ReservationNotFoundException("Reservation not found with ID: " + reservationId));
 
-        Inventory inventory = inventoryRepository.findByIdForUpdate(reservation.getInventoryId())
+        // Atomic release reservation status
+        int reservationUpdated = stockReservationRepository.atomicReleaseReservation(reservationId, Instant.now());
+        if (reservationUpdated == 0) {
+            log.warn("Reservation {} already released/fulfilled, skipping", reservationId);
+            return; // Idempotent — already processed
+        }
+
+        // Atomic restore stock
+        int stockUpdated = inventoryRepository.atomicReleaseStock(reservation.getInventoryId(), reservation.getQuantity());
+        if (stockUpdated == 0) {
+            log.error("Failed to restore stock for reservation: {}. Inventory may be inconsistent.", reservationId);
+        }
+
+        // Fetch inventory for event publishing
+        Inventory inventory = inventoryRepository.findById(reservation.getInventoryId())
                 .orElseThrow(() -> new InventoryNotFoundException("Inventory not found"));
 
-        // Update reservation status
-        reservation.setStatus(ReservationStatus.RELEASED);
-        reservation.setCancelledAt(Instant.now());
-        stockReservationRepository.save(reservation);
-
-        // Restore stock
-        inventory.setAvailableStock(inventory.getAvailableStock() + reservation.getQuantity());
-        inventory.setReservedStock(inventory.getReservedStock() - reservation.getQuantity());
-        inventoryRepository.save(inventory);
-
         log.info("Released {} units of SKU: {} for reservation: {} due to: {}",
-            reservation.getQuantity(), inventory.getSku(), reservationId, reason);
+                reservation.getQuantity(), inventory.getSku(), reservationId, reason);
 
         // Publish event
         eventProducer.publishStockReleased(inventory.getId(), inventory.getSku(), inventory.getVariantId(),
@@ -252,7 +251,10 @@ public class ReservationService {
 
     /**
      * Clean up expired reservations by releasing them and restoring stock.
-     * This should be called periodically (e.g., by a scheduled task).
+     * Uses a two-step approach:
+     * 1. Find expired ACTIVE reservations (before atomically expiring them)
+     * 2. For each, atomically release the stock
+     * 3. Atomically mark all as EXPIRED in batch
      *
      * @return Number of reservations cleaned up
      */
@@ -260,19 +262,38 @@ public class ReservationService {
     public int cleanupExpiredReservations() {
         log.info("Starting cleanup of expired reservations");
 
-        List<StockReservation> expiredReservations = getExpiredReservations();
+        Instant now = Instant.now();
+
+        // Find expired reservations first (for stock restoration)
+        List<StockReservation> expiredReservations = stockReservationRepository
+                .findByStatusAndExpiresAtBefore(ReservationStatus.ACTIVE, now);
+
+        if (expiredReservations.isEmpty()) {
+            log.info("No expired reservations found");
+            return 0;
+        }
+
         int cleanedCount = 0;
 
+        // Restore stock for each expired reservation
         for (StockReservation reservation : expiredReservations) {
             try {
-                releaseReservationInternal(reservation.getId(), "RESERVATION_EXPIRED");
-                cleanedCount++;
+                int stockUpdated = inventoryRepository.atomicReleaseStock(
+                        reservation.getInventoryId(), reservation.getQuantity());
+                if (stockUpdated > 0) {
+                    cleanedCount++;
+                    log.info("Restored {} units for expired reservation: {}",
+                            reservation.getQuantity(), reservation.getId());
+                }
             } catch (Exception e) {
-                log.error("Failed to cleanup expired reservation: {}", reservation.getId(), e);
+                log.error("Failed to restore stock for expired reservation: {}", reservation.getId(), e);
             }
         }
 
-        log.info("Cleanup completed. {} reservations were cleaned up", cleanedCount);
+        // Atomically mark all expired reservations as EXPIRED in batch
+        int expiredCount = stockReservationRepository.atomicExpireReservations(now);
+        log.info("Cleanup completed. {} reservations expired, {} stocks restored", expiredCount, cleanedCount);
+
         return cleanedCount;
     }
 
@@ -339,34 +360,38 @@ public class ReservationService {
 
     /**
      * Confirm a pending reservation and return DTO response.
-     * Controller calls this method directly.
+     * Uses atomic query — only ACTIVE reservations can be confirmed.
      *
      * @param reservationId Reservation ID
      * @return Updated reservation response DTO
      */
     @Transactional
     public ReservationResponse confirmReservation(UUID reservationId) {
-        StockReservation reservation = stockReservationRepository.findById(reservationId)
-                .orElseThrow(() -> new ReservationNotFoundException("Reservation not found with ID: " + reservationId));
+        // Atomic confirm — only succeeds if status is ACTIVE
+        int updated = stockReservationRepository.atomicConfirmReservation(reservationId);
 
-        if (!ReservationStatus.ACTIVE.equals(reservation.getStatus())) {
+        if (updated == 0) {
+            // Check if reservation exists at all
+            StockReservation reservation = stockReservationRepository.findById(reservationId)
+                    .orElseThrow(() -> new ReservationNotFoundException("Reservation not found with ID: " + reservationId));
             throw new IllegalStateException("Can only confirm ACTIVE reservations. Current status: " + reservation.getStatus());
         }
 
-        reservation.setStatus(ReservationStatus.RESERVED);
-        StockReservation updated = stockReservationRepository.save(reservation);
+        // Re-fetch for response
+        StockReservation confirmed = stockReservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ReservationNotFoundException("Reservation not found with ID: " + reservationId));
 
-        Inventory inventory = inventoryRepository.findById(updated.getInventoryId())
+        Inventory inventory = inventoryRepository.findById(confirmed.getInventoryId())
                 .orElseThrow(() -> new InventoryNotFoundException("Inventory not found"));
         eventProducer.publishStockReserved(inventory.getId(), inventory.getSku(), inventory.getVariantId(),
-                inventory.getProductId(), updated.getQuantity(), updated.getOrderId());
+                inventory.getProductId(), confirmed.getQuantity(), confirmed.getOrderId());
 
-        return convertToReservationResponse(updated);
+        return convertToReservationResponse(confirmed);
     }
 
     /**
      * Release a reservation and return DTO response.
-     * Controller calls this method directly.
+     * Uses atomic queries for both reservation status and stock restoration.
      *
      * @param reservationId Reservation ID
      * @param reason Reason for release
@@ -377,25 +402,68 @@ public class ReservationService {
         StockReservation reservation = stockReservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ReservationNotFoundException("Reservation not found with ID: " + reservationId));
 
-        Inventory inventory = inventoryRepository.findByIdForUpdate(reservation.getInventoryId())
+        // Atomic release reservation status
+        int reservationUpdated = stockReservationRepository.atomicReleaseReservation(reservationId, Instant.now());
+        if (reservationUpdated == 0) {
+            log.warn("Reservation {} already released/fulfilled, skipping", reservationId);
+            return convertToReservationResponse(reservation);
+        }
+
+        // Atomic restore stock
+        inventoryRepository.atomicReleaseStock(reservation.getInventoryId(), reservation.getQuantity());
+
+        // Fetch inventory for event publishing
+        Inventory inventory = inventoryRepository.findById(reservation.getInventoryId())
                 .orElseThrow(() -> new InventoryNotFoundException("Inventory not found"));
-
-        reservation.setStatus(ReservationStatus.RELEASED);
-        reservation.setCancelledAt(Instant.now());
-        StockReservation updated = stockReservationRepository.save(reservation);
-
-        inventory.setAvailableStock(inventory.getAvailableStock() + reservation.getQuantity());
-        inventory.setReservedStock(inventory.getReservedStock() - reservation.getQuantity());
-        inventoryRepository.save(inventory);
 
         String finalReason = reason != null && !reason.isBlank() ? reason : "Manual release";
         log.info("Released {} units of SKU: {} for reservation: {} due to: {}",
-            reservation.getQuantity(), inventory.getSku(), reservationId, finalReason);
+                reservation.getQuantity(), inventory.getSku(), reservationId, finalReason);
 
         eventProducer.publishStockReleased(inventory.getId(), inventory.getSku(), inventory.getVariantId(),
                 inventory.getProductId(), reservation.getQuantity(), reservation.getOrderId(), finalReason);
 
+        // Re-fetch for updated response
+        StockReservation updated = stockReservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ReservationNotFoundException("Reservation not found with ID: " + reservationId));
         return convertToReservationResponse(updated);
+    }
+
+    /**
+     * Fulfill a reservation — stock leaves the system (shipped to customer).
+     * Uses atomic queries: deducts from reservedStock, marks reservation as FULFILLED.
+     * Only RESERVED (confirmed) reservations can be fulfilled.
+     *
+     * @param reservationId Reservation ID
+     * @return Updated reservation response DTO
+     */
+    @Transactional
+    public ReservationResponse fulfillReservation(UUID reservationId) {
+        StockReservation reservation = stockReservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ReservationNotFoundException("Reservation not found with ID: " + reservationId));
+
+        // Atomic fulfill — only succeeds if status is RESERVED
+        int reservationUpdated = stockReservationRepository.atomicFulfillReservation(reservationId, Instant.now());
+        if (reservationUpdated == 0) {
+            throw new IllegalStateException("Can only fulfill RESERVED reservations. Current status: " + reservation.getStatus());
+        }
+
+        // Atomic confirm stock — deducts from reservedStock (stock leaves the system)
+        int stockUpdated = inventoryRepository.atomicConfirmStock(reservation.getInventoryId(), reservation.getQuantity());
+        if (stockUpdated == 0) {
+            log.error("Failed to deduct reserved stock for reservation: {}. Inventory may be inconsistent.", reservationId);
+        }
+
+        Inventory inventory = inventoryRepository.findById(reservation.getInventoryId())
+                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found"));
+
+        log.info("Fulfilled reservation: {} — {} units of SKU: {} shipped for order: {}",
+                reservationId, reservation.getQuantity(), inventory.getSku(), reservation.getOrderId());
+
+        // Re-fetch for updated response
+        StockReservation fulfilled = stockReservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ReservationNotFoundException("Reservation not found with ID: " + reservationId));
+        return convertToReservationResponse(fulfilled);
     }
 
     /**
