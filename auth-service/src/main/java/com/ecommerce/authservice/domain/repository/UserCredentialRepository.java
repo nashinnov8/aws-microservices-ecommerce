@@ -11,4 +11,7 @@ import java.util.UUID;
 public interface UserCredentialRepository extends JpaRepository<UserCredential, UUID> {
     Optional<UserCredential> findByUsername(String username);
     boolean existsByUsername(String username);
+    Optional<UserCredential> findByEmail(String email);
+    Optional<UserCredential> findByPasswordResetToken(String token);
+    Optional<UserCredential> findById(UUID id);
 }

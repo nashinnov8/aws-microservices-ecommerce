@@ -1,0 +1,42 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_HIBERNATE_DDL_AUTO}
+    database-platform: ${JPA_DATABASE_PLATFORM}
+    show-sql: ${JPA_SHOW_SQL}
+    properties:
+      hibernate:
+        format_sql: ${JPA_FORMAT_SQL}
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+        mail:
+            smtp:
+                auth: ${MAIL_SMTP_AUTH}
+                starttls:
+                    enable: ${MAIL_SMTP_STARTTLS_ENABLE}
+    default-encoding: ${MAIL_DEFAULT_ENCODING}
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION}
+  expiration-refresh: ${JWT_REFRESH_EXPIRATION}
+  verfication-expiration: ${JWT_VERIFICATION_EXPIRATION}
+  email-verification-expiration: ${JWT_EMAIL_VERIFICATION_EXPIRATION}
+  password-reset-expiration: ${JWT_PASSWORD_RESET_EXPIRATION}
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT}
+    com.ecommerce.authservice: ${LOG_LEVEL_AUTH_SERVICE}
+
+app:
+  base-url: ${APP_BASE_URL}

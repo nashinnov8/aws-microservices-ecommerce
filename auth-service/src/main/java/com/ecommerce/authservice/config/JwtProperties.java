@@ -9,6 +9,33 @@ public class JwtProperties {
     private String secret;
     private long expiration;
     private long expirationRefresh;
+    private long verificationExpiration;
+    private long emailVerificationExpiration;
+    private long passwordResetExpiration;
+
+    public long getVerificationExpiration() {
+        return verificationExpiration;
+    }
+
+    public void setVerificationExpiration(long verificationExpiration) {
+        this.verificationExpiration = verificationExpiration;
+    }
+
+    public long getEmailVerificationExpiration() {
+        return emailVerificationExpiration;
+    }
+
+    public void setEmailVerificationExpiration(long emailVerificationExpiration) {
+        this.emailVerificationExpiration = emailVerificationExpiration;
+    }
+
+    public long getPasswordResetExpiration() {
+        return passwordResetExpiration;
+    }
+
+    public void setPasswordResetExpiration(long passwordResetExpiration) {
+        this.passwordResetExpiration = passwordResetExpiration;
+    }
 
     public String getSecret() {
         return secret;

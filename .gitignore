@@ -1,84 +1,74 @@
-# Maven
-target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
-
-# Java
-*.class
-*.jar
-*.war
-*.nar
-*.ear
-*.zip
-*.tar.gz
-*.rar
-!**/target/**/*.jar
-hs_err_pid*
-
-# IDE - JetBrains
-.idea/
-*.iml
-*.iws
-*.ipr
-*.jks
-out/
-
-# IDE - VS Code
-.vscode/
-*.code-workspace
-
-# Eclipse
-.classpath
-.project
-.settings/
-*.launch
-
-# NetBeans
-nbproject/
-nb-configuration.xml
-*.nbfs
-
-# Mac
-.DS_Store
-
-# Windows
-Thumbs.db
-*.swp
-*.swo
-*~
-
-# Environment
+################################
+# Environment variables
+################################
 .env
 .env.local
 .env.*.local
 
+################################
+# IDEs
+################################
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+################################
+# OS files
+################################
+.DS_Store
+Thumbs.db
+
+################################
+# Build outputs
+################################
+/target/
+/build/
+/out/
+
+################################
 # Logs
+################################
 *.log
 logs/
 
-# Database
-*.db
-*.sqlite
+################################
+# Sensitive configuration
+################################
+**/application-local.yml
+**/application-local.properties
 
-# Docker
-.docker/
+################################
+# Test / coverage
+################################
+/coverage/
+/test-results/
+*.exec
 
-# Build outputs
-bin/
-dist/
-build/
-
-# Node (if used in any part of the project)
+################################
+# Node (if frontend exists)
+################################
 node_modules/
-npm-debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Temporary files
+################################
+# Docker
+################################
+*.env
+docker-compose.override.yml
+
+################################
+# Misc
+################################
 *.tmp
-*.temp
-.*.swp
+*.swp
+
+################################
+# Generated files
+################################
+
+reviews/*.mdreviews/*.md

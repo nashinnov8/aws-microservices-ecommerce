@@ -1,0 +1,135 @@
+spring:
+  config:
+    import:
+      - aws-secretsmanager:ecommerce/api-gateway/prod
+
+  data:
+    redis:
+      host: ${redis.host}
+      port: ${redis.port}
+      password: ${redis.password}
+      timeout: 2000ms
+      ssl:
+        enabled: true
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 8
+          min-idle: 2
+          max-wait: -1ms
+        shutdown-timeout: 100ms
+
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - ${cors.allowed-origins}
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            exposedHeaders:
+              - Authorization
+            maxAge: 3600
+
+      routes:
+        # Auth Service - Public Endpoints
+        - id: auth-service-public
+          uri: ${auth.service.url}
+          predicates:
+            - Path=/api/auth/login,/api/auth/register,/api/auth/forgot-password,/api/auth/verify-email,/api/auth/reset-password
+          filters:
+            - RewritePath=/api/auth/(?<segment>.*), /auth/$\{segment}
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
+            - name: CircuitBreaker
+              args:
+                name: authServiceCircuitBreaker
+                fallbackUri: forward:/fallback/auth
+            - name: Retry
+              args:
+                retries: 3
+                statuses: BAD_GATEWAY,GATEWAY_TIMEOUT
+
+        # Auth Service - Protected Endpoints
+        - id: auth-service-protected
+          uri: ${auth.service.url}
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - RewritePath=/api/auth/(?<segment>.*), /auth/$\{segment}
+            - JwtAuthentication
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
+            - name: CircuitBreaker
+              args:
+                name: authServiceCircuitBreaker
+                fallbackUri: forward:/fallback/auth
+
+        # Product Service (Lambda)
+        - id: product-service
+          uri: ${product.service.url}
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - RewritePath=/api/products/(?<segment>.*), /products/$\{segment}
+            - JwtAuthentication
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
+            - name: CircuitBreaker
+              args:
+                name: productServiceCircuitBreaker
+                fallbackUri: forward:/fallback/products
+
+        # Inventory Service
+        - id: inventory-service
+          uri: ${inventory.service.url}
+          predicates:
+            - Path=/api/inventory/**
+          filters:
+            - RewritePath=/api/inventory/(?<segment>.*), /api/inventory/$\{segment}
+            - JwtAuthentication
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
+            - name: CircuitBreaker
+              args:
+                name: inventoryServiceCircuitBreaker
+                fallbackUri: forward:/fallback/inventory
+
+      httpclient:
+        ssl:
+          useInsecureTrustManager: false
+
+jwt:
+  secret: ${jwt.secret}
+  expiration: ${jwt.expiration}
+
+logging:
+  level:
+    root: INFO
+    com.ecommerce.apigateway: INFO
+    org.springframework.cloud.gateway: INFO
+  file:
+    name: /var/log/api-gateway/application.log
+    max-history: 30
+
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 10
+server:
+  port: 7999
