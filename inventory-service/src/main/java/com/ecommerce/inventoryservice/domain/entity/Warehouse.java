@@ -12,10 +12,15 @@ import lombok.Setter;
  * Used for tracking stock distribution across multiple warehouses.
  */
 @Entity
-@Table(name = "warehouses", indexes = {
-    @Index(name = "idx_warehouse_code", columnList = "warehouseCode"),
-    @Index(name = "idx_warehouse_is_active", columnList = "isActive")
-})
+@Table(name = "warehouses",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_warehouse_code", columnNames = "warehouseCode")
+    },
+    indexes = {
+        @Index(name = "idx_warehouse_code", columnList = "warehouseCode"),
+        @Index(name = "idx_warehouse_is_active", columnList = "isActive")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

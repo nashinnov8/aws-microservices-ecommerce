@@ -22,5 +22,25 @@ public enum ReservationStatus {
     /**
      * Reservation expired without being fulfilled
      */
-    EXPIRED
+    EXPIRED,
+
+    /**
+     * Reservation failed due to an error (e.g. database issue)
+     */
+    FAILED,
+
+    /**
+     * Reservation is pending and awaiting confirmation (e.g. payment pending)
+     */
+    PENDING,
+
+    /**
+     * Reservation is reserved.
+     */
+    RESERVED,
+
+    /**
+     * Reservation is released and stock is returned to available inventory.
+     */
+    RELEASED
 }

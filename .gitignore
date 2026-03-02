@@ -71,4 +71,4 @@ docker-compose.override.yml
 # Generated files
 ################################
 
-reviews/*.md
+reviews/*.mdreviews/*.md
