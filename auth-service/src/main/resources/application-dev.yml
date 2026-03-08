@@ -1,42 +1,42 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/auth_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh}
+    username: ${SPRING_DATASOURCE_USERNAME:auth}
+    password: ${SPRING_DATASOURCE_PASSWORD:auth}
 
   jpa:
     hibernate:
-      ddl-auto: ${JPA_HIBERNATE_DDL_AUTO}
-    database-platform: ${JPA_DATABASE_PLATFORM}
-    show-sql: ${JPA_SHOW_SQL}
+      ddl-auto: ${JPA_HIBERNATE_DDL_AUTO:update}
+    database-platform: ${JPA_DATABASE_PLATFORM:org.hibernate.dialect.MySQLDialect}
+    show-sql: ${JPA_SHOW_SQL:true}
     properties:
       hibernate:
-        format_sql: ${JPA_FORMAT_SQL}
+        format_sql: ${JPA_FORMAT_SQL:true}
   mail:
-    host: ${MAIL_HOST}
-    port: ${MAIL_PORT}
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
         mail:
             smtp:
-                auth: ${MAIL_SMTP_AUTH}
+                auth: ${MAIL_SMTP_AUTH:true}
                 starttls:
-                    enable: ${MAIL_SMTP_STARTTLS_ENABLE}
-    default-encoding: ${MAIL_DEFAULT_ENCODING}
+                    enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+    default-encoding: ${MAIL_DEFAULT_ENCODING:UTF-8}
 
 jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION}
-  expiration-refresh: ${JWT_REFRESH_EXPIRATION}
-  verfication-expiration: ${JWT_VERIFICATION_EXPIRATION}
-  email-verification-expiration: ${JWT_EMAIL_VERIFICATION_EXPIRATION}
-  password-reset-expiration: ${JWT_PASSWORD_RESET_EXPIRATION}
+  secret: ${JWT_SECRET:Md2DcKtJIOAiWmkN3+VpZH6Eyu7fyZy03KB5hHyV5n4=}
+  expiration: ${JWT_EXPIRATION:3600000}
+  expiration-refresh: ${JWT_REFRESH_EXPIRATION:86400000}
+  verfication-expiration: ${JWT_VERIFICATION_EXPIRATION:3600000}
+  email-verification-expiration: ${JWT_EMAIL_VERIFICATION_EXPIRATION:3600000}
+  password-reset-expiration: ${JWT_PASSWORD_RESET_EXPIRATION:3600000}
 
 logging:
   level:
-    root: ${LOG_LEVEL_ROOT}
-    com.ecommerce.authservice: ${LOG_LEVEL_AUTH_SERVICE}
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.ecommerce.authservice: ${LOG_LEVEL_AUTH_SERVICE:DEBUG}
 
 app:
-  base-url: ${APP_BASE_URL}
+  base-url: ${APP_BASE_URL:http://localhost:8080}

@@ -62,15 +62,15 @@ public class AuthService {
         userCredential.setEmail(request.email());
         userCredential.setPasswordHash(encoder.encode(request.password()));
         userCredential.setRole(Role.CUSTOMER.getAuthority()); // Default role
+        userCredential.setEnabled(true); // Temporarily auto-enable without email verification
         var userSaved = repository.save(userCredential);
 
-        // Send email verification logic can be added here
-        String verificationToken = jwtService.generateVerificationToken(userSaved.getId().toString());
-        String verificationLink = baseUrl + "/auth/verify-email?token=" + verificationToken;
-        log.info("Verification link (send this via email): {}", verificationLink);
-
-        emailService.sendMail(userSaved.getEmail(), "Email Verification",
-                "Please verify your email by clicking the following link: " + verificationLink);
+        // TODO: Re-enable email verification later
+        // String verificationToken = jwtService.generateVerificationToken(userSaved.getId().toString());
+        // String verificationLink = baseUrl + "/auth/verify-email?token=" + verificationToken;
+        // log.info("Verification link (send this via email): {}", verificationLink);
+        // emailService.sendMail(userSaved.getEmail(), "Email Verification",
+        //         "Please verify your email by clicking the following link: " + verificationLink);
 
         return new RegisterResponse(
                 userSaved.getId().toString(),

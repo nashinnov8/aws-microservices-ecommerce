@@ -11,6 +11,8 @@ import com.ecommerce.productservice.dto.product.GetProductRequest;
 import com.ecommerce.productservice.dto.product.ProductRequest;
 import com.ecommerce.productservice.dto.product.ProductResponse;
 import com.ecommerce.productservice.exception.ResourceNotFoundException;
+import com.ecommerce.productservice.kafka.ProductEventProducer;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,16 +26,12 @@ import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
-
-    public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository, BrandRepository brandRepository) {
-        this.productRepository = productRepository;
-        this.categoryRepository = categoryRepository;
-        this.brandRepository = brandRepository;
-    }
+    private final ProductEventProducer productEventProducer;
 
     @Transactional
     public ProductResponse create(ProductRequest request) {
@@ -125,6 +123,10 @@ public class ProductService {
 
         Product updatedProduct = productRepository.save(product);
         log.info("Product updated successfully with id: {}", id);
+
+        // Publish VARIANT_UPDATED for all variants (product name/price affects variant metadata)
+        productEventProducer.publishProductUpdated(updatedProduct);
+
         return ProductResponse.fromEntity(updatedProduct);
     }
 
@@ -133,6 +135,11 @@ public class ProductService {
         log.info("Deleting product with id: {}", id);
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+
+        // Publish PRODUCT_DELETED events BEFORE deletion (one per variant)
+        // → inventory-service deactivates all related inventory records
+        productEventProducer.publishProductDeleted(product);
+
         productRepository.delete(product);
         log.info("Product deleted successfully with id: {}", id);
     }

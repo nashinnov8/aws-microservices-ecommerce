@@ -1,0 +1,13 @@
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/ApiGatewayApplication.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/config/RateLimitConfig.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/config/RedisConfig.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/controller/FallBackController.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/controller/fallback/AuthFallbackController.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/controller/fallback/BrandFallbackController.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/controller/fallback/CategoryFallbackController.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/controller/fallback/InventoryFallbackController.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/controller/fallback/OrderFallbackController.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/controller/fallback/ProductFallbackController.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/filter/JwtAuthenticationGatewayFilterFactory.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/service/TokenBlacklistService.java
+/home/nash/Documents/personal-projects/aws-microservices-ecommerce/api-gateway/src/main/java/com/ecommerce/apigateway/utils/FallbackResponseUtil.java

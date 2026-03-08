@@ -1,8 +1,14 @@
- spring:
+spring:
   application:
     name: product-service
 server:
   port: 8081
+
+# Kafka topic configuration
+kafka:
+  topics:
+    product-events: product-events
+    inventory-events: inventory-events
 
 management:
   endpoints:

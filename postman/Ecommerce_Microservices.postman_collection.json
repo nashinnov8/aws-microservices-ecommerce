@@ -1,0 +1,1424 @@
+{
+  "info": {
+    "name": "Ecommerce Microservices",
+    "description": "API collection for Auth, Product, Inventory, and Order services.\n\nAll requests go through the API Gateway at {{baseUrl}} (default: http://localhost:7999).\n\n**Auth flow:**\n1. Register → Verify Email → Login → Use token for protected endpoints.\n2. Login response sets `accessToken` and `refreshToken` variables automatically.\n\n**Product flow:**\n1. Create Category / Brand first.\n2. Create Product with categoryId and brandId.\n3. Create Variants under a Product.\n\n**Inventory flow:**\n1. Inventory is auto-created via Kafka when a variant is created.\n2. Use Update Stock to add/subtract/set stock levels.\n3. Use Reservations for order checkout flow.\n\n**Order flow:**\n1. Create Order → status PENDING → Kafka saga reserves stock.\n2. Poll GET order to check STOCK_RESERVED → Confirm → Processing → Ship → Deliver.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:7999",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "variantId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "brandId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderNumber",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reservationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sku",
+      "value": "IPHONE-15-PRO-BLK-256",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth Service",
+      "description": "Authentication and user management endpoints.",
+      "item": [
+        {
+          "name": "Public",
+          "description": "Endpoints that do NOT require a JWT token.",
+          "item": [
+            {
+              "name": "Register",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    pm.test('Registration successful', function () {",
+                      "        var jsonData = pm.response.json();",
+                      "        pm.expect(jsonData.success).to.eql(true);",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"username\": \"testuser\",\n    \"email\": \"testuser@example.com\",\n    \"password\": \"Test@1234\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/register",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "register"]
+                },
+                "description": "Register a new user.\n\nPassword must contain: uppercase, digit, special character, min 8 chars."
+              }
+            },
+            {
+              "name": "Verify Email",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"token\": \"<verification-token-from-email>\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/verify-email",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "verify-email"]
+                },
+                "description": "Verify user email with the token received via email."
+              }
+            },
+            {
+              "name": "Login",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.accessToken) {",
+                      "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                      "    }",
+                      "    if (jsonData.data && jsonData.data.refreshToken) {",
+                      "        pm.collectionVariables.set('refreshToken', jsonData.data.refreshToken);",
+                      "    }",
+                      "    pm.test('Login successful', function () {",
+                      "        pm.expect(jsonData.success).to.eql(true);",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"username\": \"testuser\",\n    \"password\": \"Test@1234\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "login"]
+                },
+                "description": "Login and receive access + refresh tokens.\n\nTokens are automatically saved to collection variables."
+              }
+            },
+            {
+              "name": "Forgot Password",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"email\": \"testuser@example.com\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/forgot-password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "forgot-password"]
+                },
+                "description": "Request a password reset email."
+              }
+            },
+            {
+              "name": "Reset Password",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"token\": \"<reset-token-from-email>\",\n    \"newPassword\": \"NewTest@1234\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/reset-password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "reset-password"]
+                },
+                "description": "Reset password using the token received via email.\n\nPassword must contain: uppercase, digit, special character, min 8 chars."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Protected",
+          "description": "Endpoints that require a valid JWT token in the Authorization header.",
+          "item": [
+            {
+              "name": "Refresh Token",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.accessToken) {",
+                      "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                      "    }",
+                      "    if (jsonData.data && jsonData.data.refreshToken) {",
+                      "        pm.collectionVariables.set('refreshToken', jsonData.data.refreshToken);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/refresh-token",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "refresh-token"]
+                },
+                "description": "Get a new access token using the refresh token."
+              }
+            },
+            {
+              "name": "Change Password",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"userId\": \"<your-user-id>\",\n    \"oldPassword\": \"Test@1234\",\n    \"newPassword\": \"NewTest@5678\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/change-password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "change-password"]
+                },
+                "description": "Change password for the authenticated user.\n\nNew password must contain: uppercase, digit, special character, min 8 chars."
+              }
+            },
+            {
+              "name": "Logout",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    pm.collectionVariables.set('accessToken', '');",
+                      "    pm.collectionVariables.set('refreshToken', '');",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/logout",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "logout"]
+                },
+                "description": "Logout and blacklist the current token.\n\nClears saved tokens on success."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Product Service",
+      "description": "Product catalog management: Categories, Brands, Products, and Variants.",
+      "item": [
+        {
+          "name": "Categories",
+          "description": "CRUD operations for product categories.",
+          "item": [
+            {
+              "name": "Create Category",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.id) {",
+                      "        pm.collectionVariables.set('categoryId', jsonData.data.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Electronics\",\n    \"description\": \"Electronic devices and accessories\",\n    \"imageUrl\": \"https://example.com/images/electronics.png\",\n    \"parentId\": null\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/categories",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "categories"]
+                },
+                "description": "Create a new product category.\n\nSet `parentId` to create a sub-category."
+              }
+            },
+            {
+              "name": "Get All Categories",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/categories",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "categories"]
+                }
+              }
+            },
+            {
+              "name": "Get Category by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/categories/{{categoryId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "categories", "{{categoryId}}"]
+                }
+              }
+            },
+            {
+              "name": "Update Category",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Electronics & Gadgets\",\n    \"description\": \"Updated description for electronics\",\n    \"imageUrl\": \"https://example.com/images/electronics-v2.png\",\n    \"parentId\": null\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/categories/{{categoryId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "categories", "{{categoryId}}"]
+                }
+              }
+            },
+            {
+              "name": "Delete Category",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/categories/{{categoryId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "categories", "{{categoryId}}"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Brands",
+          "description": "CRUD operations for product brands.",
+          "item": [
+            {
+              "name": "Create Brand",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.id) {",
+                      "        pm.collectionVariables.set('brandId', jsonData.data.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Apple\",\n    \"description\": \"Apple Inc. - Technology company\",\n    \"logoUrl\": \"https://example.com/logos/apple.png\",\n    \"websiteUrl\": \"https://www.apple.com\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/brands",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "brands"]
+                }
+              }
+            },
+            {
+              "name": "Get All Brands",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/brands",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "brands"]
+                }
+              }
+            },
+            {
+              "name": "Get Brand by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/brands/{{brandId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "brands", "{{brandId}}"]
+                }
+              }
+            },
+            {
+              "name": "Update Brand",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Apple Inc.\",\n    \"description\": \"Updated Apple description\",\n    \"logoUrl\": \"https://example.com/logos/apple-v2.png\",\n    \"websiteUrl\": \"https://www.apple.com\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/brands/{{brandId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "brands", "{{brandId}}"]
+                }
+              }
+            },
+            {
+              "name": "Delete Brand",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/brands/{{brandId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "brands", "{{brandId}}"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Products",
+          "description": "CRUD operations for products.",
+          "item": [
+            {
+              "name": "Create Product",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.id) {",
+                      "        pm.collectionVariables.set('productId', jsonData.data.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"iPhone 15 Pro\",\n    \"description\": \"Latest iPhone with A17 Pro chip\",\n    \"baseSku\": \"IPHONE-15-PRO\",\n    \"price\": 999.99,\n    \"imageUrl\": \"https://example.com/images/iphone15pro.png\",\n    \"categoryId\": \"{{categoryId}}\",\n    \"brandId\": \"{{brandId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/products",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products"]
+                },
+                "description": "Create a new product.\n\nRequires `categoryId` and `brandId` (optional, can be null)."
+              }
+            },
+            {
+              "name": "Get All Products (Paginated)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products?pageNumber=1&pageSize=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products"],
+                  "query": [
+                    {
+                      "key": "pageNumber",
+                      "value": "1",
+                      "description": "Page number (1-based)"
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "10",
+                      "description": "Items per page (max 100)"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Product by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/{{productId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "{{productId}}"]
+                }
+              }
+            },
+            {
+              "name": "Update Product",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"iPhone 15 Pro Max\",\n    \"description\": \"Updated description for iPhone 15 Pro Max\",\n    \"baseSku\": \"IPHONE-15-PRO-MAX\",\n    \"price\": 1199.99,\n    \"imageUrl\": \"https://example.com/images/iphone15promax.png\",\n    \"categoryId\": \"{{categoryId}}\",\n    \"brandId\": \"{{brandId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/{{productId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "{{productId}}"]
+                }
+              }
+            },
+            {
+              "name": "Delete Product",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/{{productId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "{{productId}}"]
+                },
+                "description": "Delete a product and all its variants.\n\nPublishes PRODUCT_DELETED Kafka events per variant."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Product Variants",
+          "description": "CRUD operations for product variants (size, color, material).",
+          "item": [
+            {
+              "name": "Create Variant",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.id) {",
+                      "        pm.collectionVariables.set('variantId', jsonData.data.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"variantSku\": \"IPHONE-15-PRO-BLK-256\",\n    \"size\": \"256GB\",\n    \"color\": \"Black Titanium\",\n    \"material\": \"Titanium\",\n    \"priceAdjustment\": 0.00,\n    \"imageUrl\": \"https://example.com/images/iphone15pro-black.png\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/{{productId}}/variants",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "{{productId}}", "variants"]
+                },
+                "description": "Create a variant under a product.\n\nPublishes VARIANT_CREATED Kafka event → inventory-service auto-creates inventory record."
+              }
+            },
+            {
+              "name": "Get All Variants by Product",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/{{productId}}/variants",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "{{productId}}", "variants"]
+                }
+              }
+            },
+            {
+              "name": "Get Variant by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/{{productId}}/variants/{{variantId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "{{productId}}", "variants", "{{variantId}}"]
+                }
+              }
+            },
+            {
+              "name": "Update Variant",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"variantSku\": \"IPHONE-15-PRO-WHT-512\",\n    \"size\": \"512GB\",\n    \"color\": \"White Titanium\",\n    \"material\": \"Titanium\",\n    \"priceAdjustment\": 200.00,\n    \"imageUrl\": \"https://example.com/images/iphone15pro-white.png\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/{{productId}}/variants/{{variantId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "{{productId}}", "variants", "{{variantId}}"]
+                },
+                "description": "Update a product variant.\n\nPublishes VARIANT_UPDATED Kafka event → inventory-service updates metadata."
+              }
+            },
+            {
+              "name": "Delete Variant",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/products/{{productId}}/variants/{{variantId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "products", "{{productId}}", "variants", "{{variantId}}"]
+                },
+                "description": "Delete a product variant.\n\nPublishes VARIANT_DELETED Kafka event → inventory-service deactivates inventory record."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Inventory Service",
+      "description": "Stock management, availability checks, and reservation operations.",
+      "item": [
+        {
+          "name": "Stock Management",
+          "description": "CRUD operations for inventory stock levels.",
+          "item": [
+            {
+              "name": "Get Stock by SKU",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/{{sku}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "inventory", "{{sku}}"]
+                },
+                "description": "Get stock information for a variant by SKU.\n\nReturns current stock, reserved quantity, and availability status."
+              }
+            },
+            {
+              "name": "Get Stocks by Product ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/product/{{productId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "inventory", "product", "{{productId}}"]
+                },
+                "description": "Get stock information for all variants of a product."
+              }
+            },
+            {
+              "name": "Initialize Inventory (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"sku\": \"IPHONE-15-PRO-BLK-256\",\n    \"variantId\": \"{{variantId}}\",\n    \"productId\": \"{{productId}}\",\n    \"productName\": \"iPhone 15 Pro\",\n    \"variantName\": \"Black Titanium / 256GB\",\n    \"initialStock\": 100,\n    \"minStockLevel\": 10,\n    \"maxStockLevel\": 1000,\n    \"reorderPoint\": 20\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "inventory"]
+                },
+                "description": "Manually initialize inventory for a variant.\n\nNormally inventory is auto-created via Kafka when a variant is created in product-service.\n\nRequires ADMIN or INVENTORY_MANAGER role."
+              }
+            },
+            {
+              "name": "Update Stock - ADD",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"operation\": \"ADD\",\n    \"quantity\": 50,\n    \"reason\": \"Restocked from supplier\",\n    \"performedBy\": \"admin\",\n    \"warehouseId\": null\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/{{sku}}/stock",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "inventory", "{{sku}}", "stock"]
+                },
+                "description": "Add stock for a SKU.\n\nRequires ADMIN or INVENTORY_MANAGER role.\n\nOperations: ADD, SUBTRACT, SET."
+              }
+            },
+            {
+              "name": "Update Stock - SUBTRACT",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"operation\": \"SUBTRACT\",\n    \"quantity\": 5,\n    \"reason\": \"Damaged goods removed\",\n    \"performedBy\": \"admin\",\n    \"warehouseId\": null\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/{{sku}}/stock",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "inventory", "{{sku}}", "stock"]
+                },
+                "description": "Subtract stock for a SKU."
+              }
+            },
+            {
+              "name": "Update Stock - SET",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"operation\": \"SET\",\n    \"quantity\": 200,\n    \"reason\": \"Physical count adjustment\",\n    \"performedBy\": \"admin\",\n    \"warehouseId\": null\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/{{sku}}/stock",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "inventory", "{{sku}}", "stock"]
+                },
+                "description": "Set stock to an exact quantity for a SKU."
+              }
+            },
+            {
+              "name": "Get Low Stock Alerts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/alerts/low-stock",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "inventory", "alerts", "low-stock"]
+                },
+                "description": "Get all items with stock at or below their reorder point."
+              }
+            },
+            {
+              "name": "Check Bulk Availability",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"items\": [\n        {\n            \"sku\": \"IPHONE-15-PRO-BLK-256\",\n            \"requestedQuantity\": 2\n        },\n        {\n            \"sku\": \"IPHONE-15-PRO-WHT-512\",\n            \"requestedQuantity\": 1\n        }\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/check-availability",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "inventory", "check-availability"]
+                },
+                "description": "Check stock availability for multiple SKUs without reserving."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reservations",
+          "description": "Stock reservation operations for order checkout flow.",
+          "item": [
+            {
+              "name": "Reserve Single Item",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.id) {",
+                      "        pm.collectionVariables.set('reservationId', jsonData.data.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"sku\": \"{{sku}}\",\n    \"orderId\": \"{{orderId}}\",\n    \"quantity\": 2,\n    \"expirationMinutes\": 15\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations/reserve",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations", "reserve"]
+                },
+                "description": "Reserve stock for a single item.\n\nIdempotent: orderId + sku combination prevents duplicates.\n\nDefault expiration: 15 minutes."
+              }
+            },
+            {
+              "name": "Bulk Reserve Items",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"orderId\": \"{{orderId}}\",\n    \"items\": [\n        {\n            \"sku\": \"IPHONE-15-PRO-BLK-256\",\n            \"quantity\": 1\n        },\n        {\n            \"sku\": \"IPHONE-15-PRO-WHT-512\",\n            \"quantity\": 2\n        }\n    ],\n    \"expirationMinutes\": 15\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations/bulk-reserve",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations", "bulk-reserve"]
+                },
+                "description": "Reserve stock for multiple items in a single atomic operation.\n\nUsed during cart checkout."
+              }
+            },
+            {
+              "name": "Check Availability (Reservations)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"items\": [\n        {\n            \"sku\": \"IPHONE-15-PRO-BLK-256\",\n            \"requestedQuantity\": 2\n        }\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations/check-availability",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations", "check-availability"]
+                },
+                "description": "Check stock availability without creating reservations."
+              }
+            },
+            {
+              "name": "Confirm Reservation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations/{{reservationId}}/confirm",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations", "{{reservationId}}", "confirm"]
+                },
+                "description": "Confirm a pending reservation after successful payment."
+              }
+            },
+            {
+              "name": "Release Reservation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"action\": \"RELEASE\",\n    \"reason\": \"Order cancelled by customer\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations/{{reservationId}}/release",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations", "{{reservationId}}", "release"]
+                },
+                "description": "Release a reservation and return stock to available.\n\nActions: FULFILL, RELEASE."
+              }
+            },
+            {
+              "name": "Get Reservations by Order",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations/order/{{orderId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations", "order", "{{orderId}}"]
+                },
+                "description": "Get all reservations for a specific order."
+              }
+            },
+            {
+              "name": "Get Reservation by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations/{{reservationId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations", "{{reservationId}}"]
+                },
+                "description": "Get details of a specific reservation."
+              }
+            },
+            {
+              "name": "Get Active Reservations (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations/admin/active-reservations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations", "admin", "active-reservations"]
+                },
+                "description": "Get all active (non-expired, non-released) reservations.\n\nRequires ADMIN or INVENTORY_MANAGER role."
+              }
+            },
+            {
+              "name": "Get Expired Reservations (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations/admin/expired-reservations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations", "admin", "expired-reservations"]
+                },
+                "description": "Get all expired reservations.\n\nRequires ADMIN or INVENTORY_MANAGER role."
+              }
+            },
+            {
+              "name": "Cleanup Expired Reservations (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations/admin/cleanup-expired",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations", "admin", "cleanup-expired"]
+                },
+                "description": "Clean up expired reservations and release stock back.\n\nRequires ADMIN or INVENTORY_MANAGER role.\n\nReturns the count of cleaned-up reservations."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Order Service",
+      "description": "Order lifecycle management with Kafka saga pattern.\n\nFlow: PENDING → STOCK_RESERVED → CONFIRMED → PROCESSING → SHIPPED → DELIVERED",
+      "item": [
+        {
+          "name": "Create & Read",
+          "description": "Order creation and retrieval endpoints.",
+          "item": [
+            {
+              "name": "Create Order",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 202) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.data && jsonData.data.id) {",
+                      "        pm.collectionVariables.set('orderId', jsonData.data.id);",
+                      "    }",
+                      "    if (jsonData.data && jsonData.data.orderNumber) {",
+                      "        pm.collectionVariables.set('orderNumber', jsonData.data.orderNumber);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+                  { "key": "X-User-Id", "value": "user-123" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"items\": [\n        {\n            \"sku\": \"IPHONE-15-PRO-BLK-256\",\n            \"productId\": \"{{productId}}\",\n            \"variantId\": \"{{variantId}}\",\n            \"productName\": \"iPhone 15 Pro\",\n            \"variantName\": \"Black Titanium / 256GB\",\n            \"quantity\": 1,\n            \"unitPrice\": 999.99\n        }\n    ],\n    \"shippingAddressLine1\": \"123 Main Street\",\n    \"shippingAddressLine2\": \"Apt 4B\",\n    \"shippingCity\": \"Ho Chi Minh City\",\n    \"shippingState\": \"HCM\",\n    \"shippingZipCode\": \"700000\",\n    \"shippingCountry\": \"Vietnam\",\n    \"currency\": \"USD\",\n    \"notes\": \"Please handle with care\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders"]
+                },
+                "description": "Create a new order (async saga).\n\nReturns immediately with status PENDING (HTTP 202).\nKafka saga will reserve stock automatically.\n\nPoll GET /api/orders/{id} to check status:\n- PENDING → STOCK_RESERVED (success)\n- PENDING → FAILED (insufficient stock)"
+              }
+            },
+            {
+              "name": "Get Order by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "{{orderId}}"]
+                },
+                "description": "Get order details by UUID.\n\nUse this to poll for status changes after order creation."
+              }
+            },
+            {
+              "name": "Get Order by Order Number",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/number/{{orderNumber}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "number", "{{orderNumber}}"]
+                },
+                "description": "Get order details by human-readable order number."
+              }
+            },
+            {
+              "name": "Get My Orders",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+                  { "key": "X-User-Id", "value": "user-123" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/my-orders?page=0&size=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "my-orders"],
+                  "query": [
+                    { "key": "page", "value": "0", "description": "Page number (0-based)" },
+                    { "key": "size", "value": "10", "description": "Items per page" },
+                    { "key": "status", "value": "", "description": "Filter by status (optional): PENDING, STOCK_RESERVED, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, FAILED", "disabled": true }
+                  ]
+                },
+                "description": "Get current user's orders (paginated).\n\nOptionally filter by status."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Status Transitions",
+          "description": "Order lifecycle state machine transitions.",
+          "item": [
+            {
+              "name": "Confirm Order",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/{{orderId}}/confirm",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "{{orderId}}", "confirm"]
+                },
+                "description": "Confirm order after stock is reserved.\n\nRequires order status to be STOCK_RESERVED.\n\nTransition: STOCK_RESERVED → CONFIRMED"
+              }
+            },
+            {
+              "name": "Cancel Order",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"reason\": \"Customer requested cancellation\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/{{orderId}}/cancel",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "{{orderId}}", "cancel"]
+                },
+                "description": "Cancel an order.\n\nPublishes ORDER_CANCELLED Kafka event → inventory-service releases reservations.\n\nCan cancel from most non-terminal states."
+              }
+            },
+            {
+              "name": "Mark as Processing (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/{{orderId}}/processing",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "{{orderId}}", "processing"]
+                },
+                "description": "Mark order as processing (packaging/preparing).\n\nRequires ADMIN role.\n\nTransition: CONFIRMED → PROCESSING"
+              }
+            },
+            {
+              "name": "Mark as Shipped (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/{{orderId}}/ship",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "{{orderId}}", "ship"]
+                },
+                "description": "Mark order as shipped.\n\nRequires ADMIN role.\n\nTransition: PROCESSING → SHIPPED"
+              }
+            },
+            {
+              "name": "Mark as Delivered (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/{{orderId}}/deliver",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "{{orderId}}", "deliver"]
+                },
+                "description": "Mark order as delivered.\n\nRequires ADMIN role.\n\nTransition: SHIPPED → DELIVERED\n\nPublishes ORDER_COMPLETED Kafka event → inventory-service fulfills reservations."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin",
+          "description": "Admin-only order management endpoints.",
+          "item": [
+            {
+              "name": "Get Orders by Status (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/orders/admin/by-status?status=PENDING&page=0&size=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "orders", "admin", "by-status"],
+                  "query": [
+                    { "key": "status", "value": "PENDING", "description": "Order status: PENDING, STOCK_RESERVED, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, FAILED" },
+                    { "key": "page", "value": "0", "description": "Page number (0-based)" },
+                    { "key": "size", "value": "10", "description": "Items per page" }
+                  ]
+                },
+                "description": "Get all orders filtered by status (paginated).\n\nRequires ADMIN role."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
