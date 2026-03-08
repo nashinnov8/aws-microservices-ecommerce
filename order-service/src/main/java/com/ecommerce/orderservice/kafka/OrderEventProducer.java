@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 public class OrderEventProducer {
     private final KafkaTemplate<String, OrderEvent> kafkaTemplate;
 
-    @Value("${app.kafka.topics.order-events:order-events}")
+    @Value("${kafka.topics.order-events:order-events}")
     private String orderEventsTopic;
 
     /**

@@ -15,6 +15,7 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+
 server:
   port: 8083
 
@@ -23,11 +24,6 @@ kafka:
   topics:
     order-events: order-events
     inventory-events: inventory-events
-
-# Service URLs for REST calls
-services:
-  inventory-service:
-    url: ${INVENTORY_SERVICE_URL:http://localhost:8082}
 
 management:
   endpoints:

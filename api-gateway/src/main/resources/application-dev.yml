@@ -28,7 +28,7 @@ spring:
                 redis-rate-limiter:
                     replenishRate: 10
                     requestedTokens: 1
-                key-resolver: userKeyResolver
+                key-resolver: "#{@userKeyResolver}"
             - RewritePath=/api/auth/(?<segment>.*), /auth/$\{segment}
 
         # Logout Endpoint - Gateway level (always available)
@@ -36,14 +36,14 @@ spring:
           uri: forward:///fallback/auth/logout
           predicates:
             - Path=/api/auth/logout
+            - Method=POST
           filters:
             - name: RequestRateLimiter
               args:
                 redis-rate-limiter:
                     replenishRate: 10
                     requestedTokens: 1
-                key-resolver: userKeyResolver
-            - Method=POST
+                key-resolver: "#{@userKeyResolver}"
 
         # Auth Service - Protected Endpoints
         - id: auth-service-protected
@@ -80,8 +80,33 @@ spring:
               args:
                 name: inventoryServiceCircuitBreaker
                 fallbackUri: forward:/fallback/inventory
-                requiredRoles: ROLE_ADMIN, ROLE_INVENTORY_MANAGER
             - RewritePath=/api/inventory/(?<segment>.*), /api/inventory/$\{segment}
+            - JwtAuthentication
+
+        # Reservation Service (part of inventory-service)
+        - id: reservation-service
+          uri: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/reservations/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: inventoryServiceCircuitBreaker
+                fallbackUri: forward:/fallback/inventory
+            - RewritePath=/api/reservations/(?<segment>.*), /api/reservations/$\{segment}
+            - JwtAuthentication
+
+        # Order Service
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: orderServiceCircuitBreaker
+                fallbackUri: forward:/fallback/orders
+            - RewritePath=/api/orders/(?<segment>.*), /api/orders/$\{segment}
             - JwtAuthentication
 
 
@@ -107,6 +132,11 @@ resilience4j:
         failureRateThreshold: 70
 
       inventoryServiceCircuitBreaker:
+        baseConfig: default
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 70
+
+      orderServiceCircuitBreaker:
         baseConfig: default
         waitDurationInOpenState: 10s
         failureRateThreshold: 70

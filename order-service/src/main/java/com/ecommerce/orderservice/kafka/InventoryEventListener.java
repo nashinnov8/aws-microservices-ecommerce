@@ -9,10 +9,21 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * SAGA RESPONSE HANDLER — consumes inventory events from inventory-service.
+ *
+ * This listener is CRITICAL for the saga pattern. It receives the async response
+ * from inventory-service after ORDER_CREATED was published:
+ *
+ * - STOCK_RESERVED            → Order PENDING → STOCK_RESERVED (saga success)
+ * - STOCK_RESERVATION_FAILED  → Order PENDING → FAILED (saga failure)
+ * - STOCK_RELEASED            → Logged (compensation confirmed)
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -25,14 +36,16 @@ public class InventoryEventListener {
             groupId = "order-service",
             containerFactory = "inventoryEventListenerContainerFactory"
     )
+    @Transactional
     public void handleInventoryEvent(String message) {
         try {
             InventoryEvent event = objectMapper.readValue(message, InventoryEvent.class);
-            log.info("Received inventory event: {} for SKU: {}, referenceId: {}",
+            log.info("Received inventory event: {} for SKU: {}, referenceId (orderId): {}",
                     event.eventType(), event.sku(), event.referenceId());
 
             switch (event.eventType()) {
                 case InventoryEvent.STOCK_RESERVED -> handleStockReserved(event);
+                case InventoryEvent.STOCK_RESERVATION_FAILED -> handleStockReservationFailed(event);
                 case InventoryEvent.STOCK_RELEASED -> handleStockReleased(event);
                 case InventoryEvent.OUT_OF_STOCK -> handleOutOfStock(event);
                 case InventoryEvent.BACK_IN_STOCK -> handleBackInStock(event);
@@ -47,21 +60,17 @@ public class InventoryEventListener {
     }
 
     /**
-     * SAGA SUCCESS -> Stock was reserved for this order
-     * Status will be changed from PENDING to STOCK_RESERVED
-     * <p>
+     * SAGA SUCCESS — Stock was reserved for this order.
+     * Transition: PENDING → STOCK_RESERVED.
+     *
      * Note: inventory-service publishes one STOCK_RESERVED event per SKU.
-     * For multi-item orders, we receive multiple events. The first one transitions the order;
-     * subsequent ones are idempotent.
+     * For multi-item orders, we receive multiple events. The first one
+     * transitions the order; subsequent ones are idempotent.
      */
     private void handleStockReserved(InventoryEvent event) {
-        log.info("Stock reserved for order: {}, SKU: {}, quantity: {}",
-                event.referenceId(), event.sku(), event.newQuantity());
-        // Could update order status to STOCK_RESERVED if tracking per-item status
         String orderId = event.referenceId();
-
         if (orderId == null) {
-            log.debug("No referenceId in STOCK_RESERVED event, skipping order update");
+            log.debug("STOCK_RESERVED event without referenceId (not order-related), skipping");
             return;
         }
 
@@ -69,72 +78,66 @@ public class InventoryEventListener {
                 orderId, event.sku(), event.newQuantity());
 
         Optional<Order> orderOpt = findOrder(orderId);
-
-        if (orderOpt.isEmpty()) {
-            return;
-        }
+        if (orderOpt.isEmpty()) return;
 
         Order order = orderOpt.get();
-        if (order.getStatus() == OrderStatus.PENDING)  {
+        if (order.getStatus() == OrderStatus.PENDING) {
             order.setStatus(OrderStatus.STOCK_RESERVED);
             orderRepository.save(order);
-            log.info("Order {} status updated to STOCK_RESERVED", orderId);
+            log.info("Order {} transitioned PENDING → STOCK_RESERVED", order.getOrderNumber());
         } else {
-            log.debug("Order {} already in status {}, ignoring STOCK_RESERVED event",
-                    orderId, order.getStatus());
+            log.debug("Order {} already in status {}, ignoring STOCK_RESERVED",
+                    order.getOrderNumber(), order.getStatus());
         }
     }
 
     /**
-     * SAGA FAILURE -> Stock reservation failed for this order
-     * Status will be changed from PENDING to FAILED
-     * <p>
-     * Note: inventory-service publishes one STOCK_RESERVATION_FAILED event per SKU.
-     * For multi-item orders, we receive multiple events. The first one transitions the order;
-     * subsequent ones are idempotent.
+     * SAGA FAILURE — Stock reservation failed for this order.
+     * Transition: PENDING → FAILED.
+     *
+     * Inventory-service was unable to reserve stock for one or more items.
+     * The order cannot proceed.
      */
-    private void handleStockReservedFailed(InventoryEvent event) {
-        log.warn("Stock reservation FAILED for order: {}, SKU: {}, quantity: {}, reason: {}",
-                event.referenceId(), event.sku(), event.newQuantity(), event.reason());
-        // Could update order status to FAILED if tracking per-item status
-         String orderId = event.referenceId();
-
+    private void handleStockReservationFailed(InventoryEvent event) {
+        String orderId = event.referenceId();
         if (orderId == null) {
-            log.debug("No referenceId in STOCK_RESERVATION_FAILED event, skipping order update");
+            log.warn("STOCK_RESERVATION_FAILED event without referenceId, skipping");
             return;
         }
 
-        log.warn("Stock reservation FAILED for order: {}, SKU: {}, quantity: {}, reason: {}",
-                orderId, event.sku(), event.newQuantity(), event.reason());
+        log.warn("Stock reservation FAILED for order: {}, SKU: {}, reason: {}",
+                orderId, event.sku(), event.reason());
 
         Optional<Order> orderOpt = findOrder(orderId);
-
-        if (orderOpt.isEmpty()) {
-            return;
-        }
+        if (orderOpt.isEmpty()) return;
 
         Order order = orderOpt.get();
-        if (order.getStatus() == OrderStatus.PENDING)  {
+        if (order.getStatus() == OrderStatus.PENDING) {
             order.setStatus(OrderStatus.FAILED);
+            order.setCancelledReason("Stock reservation failed: " + event.reason());
             orderRepository.save(order);
-            log.info("Order {} status updated to FAILED", orderId);
+            log.info("Order {} transitioned PENDING → FAILED due to stock reservation failure",
+                    order.getOrderNumber());
         } else {
-            log.debug("Order {} already in status {}, ignoring STOCK_RESERVATION_FAILED event",
-                    orderId, order.getStatus());
+            log.debug("Order {} already in status {}, ignoring STOCK_RESERVATION_FAILED",
+                    order.getOrderNumber(), order.getStatus());
         }
     }
 
+    /**
+     * Helper to find order by referenceId (orderId string).
+     * Handles UUID parsing and not-found gracefully.
+     */
     private Optional<Order> findOrder(String orderId) {
         try {
-            UUID orderUuid = UUID.fromString(orderId);
-            Optional<Order> orderOpt = orderRepository.findByIdForUpdate(orderUuid);
+            UUID uuid = UUID.fromString(orderId);
+            Optional<Order> orderOpt = orderRepository.findByIdForUpdate(uuid);
             if (orderOpt.isEmpty()) {
-                log.warn("Order not found for STOCK_RESERVED event: {}", orderId);
-                return Optional.empty();
+                log.warn("Order not found for referenceId: {}", orderId);
             }
             return orderOpt;
-        } catch (IllegalArgumentException exception) {
-            log.warn("Invalid orderId in inventory event: {}", orderId, exception);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid UUID in referenceId: {}", orderId);
             return Optional.empty();
         }
     }

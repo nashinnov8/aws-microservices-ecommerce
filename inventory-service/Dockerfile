@@ -3,7 +3,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN mvn clean package -DskipTests -pl auth-service -am
+RUN mvn clean package -DskipTests -pl inventory-service -am
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
