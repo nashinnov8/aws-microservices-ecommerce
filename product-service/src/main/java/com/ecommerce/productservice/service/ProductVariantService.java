@@ -8,6 +8,9 @@ import com.ecommerce.productservice.domain.repository.ProductVariantRepository;
 import com.ecommerce.productservice.dto.producvariant.ProductVariantRequest;
 import com.ecommerce.productservice.dto.producvariant.ProductVariantResponse;
 import com.ecommerce.productservice.exception.ResourceNotFoundException;
+import com.ecommerce.productservice.kafka.ProductEventProducer;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,14 +19,12 @@ import java.util.UUID;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
+@Slf4j
 public class ProductVariantService {
     private final ProductVariantRepository productVariantRepository;
     private final ProductRepository productRepository;
-
-    public ProductVariantService(ProductVariantRepository productVariantRepository, ProductRepository productRepository) {
-        this.productVariantRepository = productVariantRepository;
-        this.productRepository = productRepository;
-    }
+    private final ProductEventProducer productEventProducer;
 
     @Transactional
     public ProductVariantResponse create(UUID productId, ProductVariantRequest request) {
@@ -41,6 +42,11 @@ public class ProductVariantService {
         variant.setStatus(ProductStatus.ACTIVE);
 
         ProductVariant savedVariant = productVariantRepository.save(variant);
+        log.info("Created variant {} (SKU: {}) for product {}", savedVariant.getId(), savedVariant.getVariantSku(), productId);
+
+        // Publish VARIANT_CREATED event → inventory-service auto-creates inventory record
+        productEventProducer.publishVariantCreated(savedVariant);
+
         return ProductVariantResponse.fromEntity(savedVariant);
     }
 
@@ -74,6 +80,11 @@ public class ProductVariantService {
         variant.setImageUrl(request.imageUrl());
 
         ProductVariant updatedVariant = productVariantRepository.save(variant);
+        log.info("Updated variant {} (SKU: {})", updatedVariant.getId(), updatedVariant.getVariantSku());
+
+        // Publish VARIANT_UPDATED event → inventory-service updates metadata
+        productEventProducer.publishVariantUpdated(updatedVariant);
+
         return ProductVariantResponse.fromEntity(updatedVariant);
     }
 
@@ -81,6 +92,12 @@ public class ProductVariantService {
     public void delete(UUID id) {
         ProductVariant variant = productVariantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product variant not found with id: " + id));
+
+        log.info("Deleting variant {} (SKU: {})", variant.getId(), variant.getVariantSku());
+
+        // Publish VARIANT_DELETED event BEFORE deletion → inventory-service deactivates record
+        productEventProducer.publishVariantDeleted(variant);
+
         productVariantRepository.delete(variant);
     }
 }
