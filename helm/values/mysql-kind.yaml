@@ -1,0 +1,18 @@
+auth:
+  rootPassword: root
+  username: auth
+  password: auth
+  database: auth_db
+
+image:
+  registry: docker.io
+  repository: bitnamilegacy/mysql
+  tag: 9.4.0-debian-12-r1
+
+primary:
+  persistence:
+    enabled: false
+
+secondary:
+  replicaCount: 0
+

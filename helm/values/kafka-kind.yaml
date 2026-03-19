@@ -1,0 +1,25 @@
+kraft:
+  enabled: true
+
+image:
+  registry: docker.io
+  repository: bitnamilegacy/kafka
+  tag: 4.0.0-debian-12-r10
+
+controller:
+  replicaCount: 1
+  persistence:
+    enabled: false
+
+broker:
+  replicaCount: 1
+  persistence:
+    enabled: false
+
+listeners:
+  client:
+    protocol: PLAINTEXT
+  controller:
+    protocol: PLAINTEXT
+  interbroker:
+    protocol: PLAINTEXT
