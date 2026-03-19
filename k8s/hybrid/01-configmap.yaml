@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecommerce-shared-config
+  namespace: ecommerce
+data:
+  SPRING_PROFILES_ACTIVE: dev
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  REDIS_HOST: redis-master
+  REDIS_PORT: "6379"
+  AUTH_SERVICE_URL: http://auth-service:8080
+  PRODUCT_SERVICE_URL: http://product-service:8081
+  INVENTORY_SERVICE_URL: http://inventory-service:8082
+  ORDER_SERVICE_URL: http://order-service:8083
+  APP_BASE_URL: http://api-gateway:7999
+  MYSQL_HOST: mysql
+  MYSQL_PORT: "3306"
+
