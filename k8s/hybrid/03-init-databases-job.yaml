@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mysql-init-databases
+  namespace: ecommerce
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mysql-client
+          image: mysql:8.0
+          env:
+            - name: MYSQL_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ecommerce-shared-config
+                  key: MYSQL_HOST
+            - name: MYSQL_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ecommerce-shared-config
+                  key: MYSQL_PORT
+            - name: MYSQL_USER
+              value: root
+            - name: MYSQL_PASSWORD
+              value: root
+            - name: APP_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-shared-secret
+                  key: AUTH_DB_USERNAME
+            - name: APP_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-shared-secret
+                  key: AUTH_DB_PASSWORD
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for MySQL to accept connections..."
+              until mysqladmin ping -h "${MYSQL_HOST}" -P "${MYSQL_PORT}" -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" --silent; do
+                sleep 2
+              done
+
+              echo "Creating databases and grants..."
+              mysql -h "${MYSQL_HOST}" -P "${MYSQL_PORT}" -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" <<SQL
+              CREATE DATABASE IF NOT EXISTS auth_db;
+              CREATE DATABASE IF NOT EXISTS product_db;
+              CREATE DATABASE IF NOT EXISTS inventory_db;
+              CREATE DATABASE IF NOT EXISTS order_db;
+
+              CREATE USER IF NOT EXISTS '${APP_DB_USERNAME}'@'%' IDENTIFIED BY '${APP_DB_PASSWORD}';
+              ALTER USER '${APP_DB_USERNAME}'@'%' IDENTIFIED BY '${APP_DB_PASSWORD}';
+
+              GRANT ALL PRIVILEGES ON auth_db.* TO '${APP_DB_USERNAME}'@'%';
+              GRANT ALL PRIVILEGES ON product_db.* TO '${APP_DB_USERNAME}'@'%';
+              GRANT ALL PRIVILEGES ON inventory_db.* TO '${APP_DB_USERNAME}'@'%';
+              GRANT ALL PRIVILEGES ON order_db.* TO '${APP_DB_USERNAME}'@'%';
+
+              FLUSH PRIVILEGES;
+              SQL
+
+              echo "Databases and user grants are ready."
