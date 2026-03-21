@@ -39,6 +39,10 @@ jobs:
     - name: Build with Maven
       run: mvn -B clean install -pl inventory-service -am
 
+    - name: Get Git SHA
+      id: vars
+      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
     - name: Log in to Docker Hub
       if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
       uses: docker/login-action@v3
@@ -46,9 +50,36 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Build and push Inventory Service
-      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    - name: Build and Push Docker Image
+      if: github.event_name == 'push'
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/inventory-service:dev -f inventory-service/Dockerfile .
-        docker push ${{ secrets.DOCKER_USERNAME }}/inventory-service:dev
+        # Set tag based on branch
+        if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+          TAG=${{ steps.vars.outputs.sha_short }}
+        else
+          TAG="dev"
+        fi
+        echo "Building and pushing image with tag: $TAG"
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/inventory-service:$TAG -f inventory-service/Dockerfile .
+        docker push ${{ secrets.DOCKER_USERNAME }}/inventory-service:$TAG
+        # Save tag for next step
+        echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
+
+    - name: Update GitOps Repository (on main branch push)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      env:
+        GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
+      run: |
+        echo "Triggering GitOps update..."
+        # 1. Clone GitOps repo
+        git clone https://$GITOPS_PAT@github.com/nashinnov8/ecommerce-gitops.git
+        cd ecommerce-gitops
+        # 2. Update image tag in manifest
+        sed -i "s|image: ${{ secrets.DOCKER_USERNAME }}/inventory-service:.*|image: ${{ secrets.DOCKER_USERNAME }}/inventory-service:${{ env.IMAGE_TAG }}|g" apps/base/inventory-service/manifest.yaml
+        # 3. Commit and push changes
+        git config user.name "GitHub Actions Bot"
+        git config user.email "actions@github.com"
+        git add apps/base/inventory-service/manifest.yaml
+        git commit -m "ci(inventory): auto deploy version ${{ env.IMAGE_TAG }}"
+        git push origin main
 
