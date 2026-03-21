@@ -11,6 +11,7 @@ import com.ecommerce.productservice.dto.product.GetProductRequest;
 import com.ecommerce.productservice.dto.product.ProductRequest;
 import com.ecommerce.productservice.dto.product.ProductResponse;
 import com.ecommerce.productservice.exception.ResourceNotFoundException;
+import com.ecommerce.productservice.kafka.ProductEventProducer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
