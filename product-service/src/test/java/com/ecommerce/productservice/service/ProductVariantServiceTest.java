@@ -39,6 +39,9 @@ class ProductVariantServiceTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private ProductEventProducer productEventProducer;
+
     @InjectMocks
     private ProductVariantService productVariantService;
 

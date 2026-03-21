@@ -50,6 +50,9 @@ class ProductServiceTest {
     @Mock
     private BrandRepository brandRepository;
 
+    @Mock
+    private ProductEventProducer productEventProducer;
+
     @InjectMocks
     private ProductService productService;
 
