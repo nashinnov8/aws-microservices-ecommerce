@@ -8,6 +8,7 @@ import com.ecommerce.productservice.domain.repository.ProductVariantRepository;
 import com.ecommerce.productservice.dto.producvariant.ProductVariantRequest;
 import com.ecommerce.productservice.dto.producvariant.ProductVariantResponse;
 import com.ecommerce.productservice.exception.ResourceNotFoundException;
+import com.ecommerce.productservice.kafka.ProductEventProducer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -38,6 +39,9 @@ class ProductVariantServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private ProductEventProducer productEventProducer;
 
     @InjectMocks
     private ProductVariantService productVariantService;

@@ -1,0 +1,85 @@
+name: Order Service CI
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+    paths:
+      - 'order-service/**'
+      - 'common/**'
+  pull_request:
+    branches: [ "main", "develop" ]
+    paths:
+      - 'order-service/**'
+      - 'common/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Cache Maven packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+
+    - name: Build with Maven
+      run: mvn -B clean install -pl order-service -am
+
+    - name: Get Git SHA
+      id: vars
+      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Log in to Docker Hub
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and Push Docker Image
+      if: github.event_name == 'push'
+      run: |
+        # Set tag based on branch
+        if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+          TAG=${{ steps.vars.outputs.sha_short }}
+        else
+          TAG="dev"
+        fi
+        echo "Building and pushing image with tag: $TAG"
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/order-service:$TAG -f order-service/Dockerfile .
+        docker push ${{ secrets.DOCKER_USERNAME }}/order-service:$TAG
+        # Save tag for next step
+        echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
+
+    - name: Update GitOps Repository (on main branch push)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      env:
+        GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
+      run: |
+        echo "Triggering GitOps update..."
+        # 1. Clone GitOps repo
+        git clone https://$GITOPS_PAT@github.com/nashinnov8/ecommerce-gitops.git
+        cd ecommerce-gitops
+        # 2. Update image tag in manifest
+        sed -i "s|image: ${{ secrets.DOCKER_USERNAME }}/order-service:.*|image: ${{ secrets.DOCKER_USERNAME }}/order-service:${{ env.IMAGE_TAG }}|g" apps/base/order-service/manifest.yaml
+        # 3. Commit and push changes
+        git config user.name "GitHub Actions Bot"
+        git config user.email "actions@github.com"
+        git add apps/base/order-service/manifest.yaml
+        git commit -m "ci(order): auto deploy version ${{ env.IMAGE_TAG }}"
+        git push origin main
+
